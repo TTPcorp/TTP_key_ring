@@ -2,7 +2,7 @@
 
 Gestor de contraseñas de escritorio para uso interno. Guarda las credenciales de páginas web y programas de forma **local y cifrada**, y las **rellena automáticamente** en ambos. Permite usar contraseñas largas y únicas sin depender de ningún servicio en la nube: la aplicación no se conecta a internet.
 
-> **Estado:** Fase 0 casi terminada y Fase 1 (MVP) en marcha. El `core` ya sabe crear, abrir, editar y guardar un llavero cifrado; todavía no hay interfaz ni aplicación usable. Detalle en [Avances](#avances) y en [`informes/`](informes/).
+> **Estado:** Fase 0 terminada. Fase 1 (MVP) en marcha. El `core` ya sabe crear, abrir, editar y guardar un llavero cifrado; todavía no hay interfaz ni aplicación usable. Detalle en [Avances](#avances) y en [`informes/`](informes/).
 
 ## Características
 
@@ -62,7 +62,8 @@ La especificación del formato del archivo cifrado está en [`docs/vault-format.
 - **Requisitos de Tauri 2 en Windows:**
   - [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (Build Tools de Visual Studio) con la carga de trabajo «Desarrollo para el escritorio con C++».
   - **WebView2** (incluido en Windows 10 actualizado y Windows 11).
-- **Node.js** (versión LTS) para la interfaz. Se usará cuando se elija el framework de interfaz.
+- **Node.js** (versión LTS) para la interfaz, hecha con **Svelte 5 + Vite**. Se necesitará cuando se integre la interfaz en `app/`.
+- **cargo-deny** (opcional en local; la CI siempre lo ejecuta): `cargo install cargo-deny --locked`.
 
 ## Puesta en marcha
 
@@ -88,7 +89,10 @@ Comprobaciones antes de enviar cambios (las mismas que ejecuta la integración c
 ```bash
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
+cargo deny --locked check
 ```
+
+`cargo deny` revisa que ninguna dependencia tenga vulnerabilidades publicadas, que todas las licencias sean permisivas y que todo venga de crates.io (configuración en `deny.toml`).
 
 Lanzar la app en modo desarrollo: *pendiente*. Cuando se integre Tauri será `cargo tauri dev` (requiere `cargo install tauri-cli`). De momento `app/` es un binario vacío.
 
@@ -100,9 +104,10 @@ Leyenda: ✅ hecho · 🚧 en curso · ⬜ pendiente. Cada avance tiene su infor
 - ✅ Repositorio y workspace de Cargo ([0001](informes/0001-2026-11-24-esqueleto-workspace.md))
 - ✅ README, CLAUDE.md y reglas de contribución ([0001](informes/0001-2026-11-24-esqueleto-workspace.md))
 - ✅ Diseño del formato `.vault` ([0002](informes/0002-2026-11-24-ci-y-formato-vault.md), [`docs/vault-format.md`](docs/vault-format.md))
-- 🚧 CI (build, tests, `clippy`, `fmt`) en Windows y Linux: configurada, pendiente de su primera ejecución ([0002](informes/0002-2026-11-24-ci-y-formato-vault.md))
+- ✅ CI (build, tests, `clippy`, `fmt`) en Windows y Linux, en verde ([0002](informes/0002-2026-11-24-ci-y-formato-vault.md), [0006](informes/0006-2026-11-24-cierre-fase-0.md))
+- ✅ Seguridad de dependencias: `cargo-deny` en la CI (más una revisión semanal) y Dependabot ([0006](informes/0006-2026-11-24-cierre-fase-0.md))
 - ✅ Carpeta de informes y seguimiento de avances ([0004](informes/0004-2026-11-24-informes-y-avances.md))
-- ⬜ Elegir framework de interfaz
+- ✅ Framework de interfaz elegido: Svelte 5 + Vite, sin SvelteKit ([0006](informes/0006-2026-11-24-cierre-fase-0.md))
 
 **Fase 1 — MVP**
 - ✅ Cifrado: Argon2id + XChaCha20-Poly1305 en `core::crypto` ([0003](informes/0003-2026-11-24-capa-criptografica.md))

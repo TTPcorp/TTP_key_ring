@@ -1,0 +1,25 @@
+# Dependabot: weekly update PRs. Every PR goes through CI (including
+# cargo-deny) and must be reviewed by a person before merging.
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      # Patch/minor bumps in one PR; major bumps get their own PR.
+      cargo-minor-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  # npm will be added when the Svelte frontend exists.
