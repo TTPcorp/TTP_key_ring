@@ -56,6 +56,28 @@ jobs:
         run: cargo install cargo-deny --locked --version "$CARGO_DENY_VERSION"
       - run: cargo deny --locked check
 
+  frontend:
+    name: frontend (svelte-check, build, npm audit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      # Exact versions from package-lock.json; install scripts disabled (.npmrc).
+      - run: npm ci
+      - name: Known vulnerabilities in npm dependencies
+        run: npm audit --audit-level=low
+      - name: Type check (svelte-check)
+        run: npm run check
+      - name: Build
+        run: npm run build
+
   check:
     name: clippy + test (${{ matrix.os }})
     needs: fmt
@@ -70,6 +92,20 @@ jobs:
           persist-credentials: false
       - name: Install toolchain from rust-toolchain.toml
         run: rustup toolchain install
+      - name: Install Tauri system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - name: Cache cargo registry and build output
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: cargo-${{ runner.os }}-
       - name: Build
         run: cargo build --workspace --all-targets --locked
       - name: Clippy

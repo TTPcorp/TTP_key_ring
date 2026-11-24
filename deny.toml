@@ -17,7 +17,18 @@ all-features = true
 yanked = "deny"
 unmaintained = "all"
 unsound = "all"
-ignore = []
+# Every exception must state why it is acceptable and when to revisit it.
+ignore = [
+    # proc-macro-error is unmaintained. Only reached on Linux, as a
+    # *build-time* proc-macro of glib-macros (Tauri -> gtk 0.18 stack).
+    # No runtime code; not in the Windows build. Revisit when Tauri moves
+    # to gtk4/glib >= 0.20, and before the Linux port (phase 4).
+    { id = "RUSTSEC-2024-0370", reason = "Linux-only build-time proc-macro via Tauri's gtk 0.18 stack; not in the Windows build" },
+    # glib::VariantStrIter unsoundness. Only on Linux, through Tauri's
+    # webkit2gtk/gtk 0.18 stack; we never use glib variants ourselves and
+    # glib is not in the Windows build. Revisit as above.
+    { id = "RUSTSEC-2024-0429", reason = "Linux-only, via Tauri's gtk 0.18 stack; API not used by us; not in the Windows build" },
+]
 
 [licenses]
 # Permissive licenses only, limited to those actually in use.
@@ -25,9 +36,35 @@ ignore = []
 allow = [
     "MIT",
     "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception", # target-lexicon (Tauri build)
+    "BSD-3-Clause",                   # brotli and its allocators (Tauri asset compression)
     "Unicode-3.0",
+    "Zlib",                           # foldhash
 ]
 confidence-threshold = 0.9
+
+# MPL-2.0 is weak, file-level copyleft: using the crates unmodified places
+# no obligation on our code. It is NOT allowed globally, only for these
+# crates (if we ever modify one of their files, that file must stay MPL).
+[[licenses.exceptions]]
+crate = "cssparser"
+allow = ["MPL-2.0"]
+
+[[licenses.exceptions]]
+crate = "cssparser-macros"
+allow = ["MPL-2.0"]
+
+[[licenses.exceptions]]
+crate = "selectors"
+allow = ["MPL-2.0"]
+
+[[licenses.exceptions]]
+crate = "dtoa-short"
+allow = ["MPL-2.0"]
+
+[[licenses.exceptions]]
+crate = "option-ext"   # via dirs-sys
+allow = ["MPL-2.0"]
 
 [licenses.private]
 # Our own crates are not published (license still to be decided).

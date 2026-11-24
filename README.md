@@ -2,7 +2,7 @@
 
 Gestor de contraseñas de escritorio para uso interno. Guarda las credenciales de páginas web y programas de forma **local y cifrada**, y las **rellena automáticamente** en ambos. Permite usar contraseñas largas y únicas sin depender de ningún servicio en la nube: la aplicación no se conecta a internet.
 
-> **Estado:** Fase 0 terminada. Fase 1 (MVP) en marcha. El `core` ya sabe crear, abrir, editar y guardar un llavero cifrado; todavía no hay interfaz ni aplicación usable. Detalle en [Avances](#avances) y en [`informes/`](informes/).
+> **Estado:** Fase 0 terminada. Fase 1 (MVP) en marcha. El `core` ya sabe crear, abrir, editar y guardar un llavero cifrado, y la app de escritorio ya permite crear o abrir el llavero, ver y buscar entradas y bloquearlo. Falta poder añadir y editar entradas desde la app. Detalle en [Avances](#avances) y en [`informes/`](informes/).
 
 ## Características
 
@@ -15,7 +15,7 @@ Leyenda: ✅ disponible · 🚧 en desarrollo · 📋 prevista
 | Generador de contraseñas seguras | 🚧 Fase 1 — hecho en el `core`; falta la interfaz |
 | Copia al portapapeles con limpieza automática (15–30 s) | 📋 Fase 1 |
 | Bloqueo automático por inactividad o al bloquear la sesión de Windows | 📋 Fase 1 |
-| Lista, búsqueda y formulario de entradas | 📋 Fase 1 |
+| Lista, búsqueda y formulario de entradas | 🚧 Fase 1 — lista y búsqueda hechas; falta el formulario |
 | Guardado atómico y copia de seguridad del archivo cifrado | 🚧 Fase 1 — hecho en el `core`; falta la interfaz |
 | Auto-type en programas con atajo de teclado global | 📋 Fase 2 |
 | Extensión de navegador con autorrelleno y coincidencia exacta de dominio | 📋 Fase 3 |
@@ -62,7 +62,8 @@ La especificación del formato del archivo cifrado está en [`docs/vault-format.
 - **Requisitos de Tauri 2 en Windows:**
   - [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (Build Tools de Visual Studio) con la carga de trabajo «Desarrollo para el escritorio con C++».
   - **WebView2** (incluido en Windows 10 actualizado y Windows 11).
-- **Node.js** (versión LTS) para la interfaz, hecha con **Svelte 5 + Vite**. Se necesitará cuando se integre la interfaz en `app/`.
+- **Node.js** 22 o superior, para la interfaz (Svelte 5 + Vite, en `app/ui/`).
+- **Solo en Linux**, las librerías de sistema de Tauri (Ubuntu/Debian): `sudo apt install libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev`.
 - **cargo-deny** (opcional en local; la CI siempre lo ejecuta): `cargo install cargo-deny --locked`.
 
 ## Puesta en marcha
@@ -94,7 +95,35 @@ cargo deny --locked check
 
 `cargo deny` revisa que ninguna dependencia tenga vulnerabilidades publicadas, que todas las licencias sean permisivas y que todo venga de crates.io (configuración en `deny.toml`).
 
-Lanzar la app en modo desarrollo: *pendiente*. Cuando se integre Tauri será `cargo tauri dev` (requiere `cargo install tauri-cli`). De momento `app/` es un binario vacío.
+Comprobaciones de la interfaz (desde la carpeta `app/`):
+
+```bash
+npm ci
+```
+
+```bash
+npm audit --audit-level=low
+```
+
+```bash
+npm run check
+```
+
+`npm ci` instala las versiones exactas de `package-lock.json` sin ejecutar scripts de instalación (lo impide `app/.npmrc`, como protección frente a paquetes maliciosos).
+
+Lanzar la app en modo desarrollo (desde `app/`, después de `npm ci`). Abre la ventana y recarga la interfaz al guardar cambios:
+
+```bash
+npm run tauri dev
+```
+
+Generar el ejecutable y los instaladores de producción (desde `app/`):
+
+```bash
+npm run tauri build
+```
+
+La app guarda el llavero en la carpeta de datos del usuario: `%APPDATA%\LLavero Digital\llavero.vault` en Windows. En modo desarrollo usa otra carpeta, `LLavero Digital (desarrollo)`, para que las pruebas nunca toquen el llavero real.
 
 ## Avances
 
@@ -115,7 +144,7 @@ Leyenda: ✅ hecho · 🚧 en curso · ⬜ pendiente. Cada avance tiene su infor
 - ✅ Crear/abrir llavero, cabecera del archivo, guardado atómico, `.bak`, exportación y cambio de contraseña maestra (`core::vault`) ([0005](informes/0005-2026-11-24-modelo-y-archivo-vault.md))
 - ✅ Generador de contraseñas (`core::generator`) ([0007](informes/0007-2026-11-24-generador-contrasenas.md))
 - ⬜ Bloqueo automático y limpieza del portapapeles
-- ⬜ Interfaz con lista, búsqueda y formulario
+- 🚧 Interfaz: app Tauri 2 + Svelte con crear/abrir llavero, lista, búsqueda y bloqueo manual ([0008](informes/0008-2026-11-24-app-tauri-svelte.md)); falta el formulario de entradas
 
 **Fases 2–4:** sin empezar.
 
