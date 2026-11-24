@@ -1,0 +1,12 @@
+[package]
+name = "llavero-core"
+description = "Portable core: vault format, encryption, entry model, password generator and matching. No OS or Tauri dependencies."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

@@ -1,0 +1,12 @@
+[package]
+name = "llavero-platform"
+description = "OS abstraction traits and per-OS implementations (Windows first)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true
