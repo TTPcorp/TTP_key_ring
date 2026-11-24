@@ -1,6 +1,6 @@
 # Formato del archivo `.vault` — versión 1
 
-> **Estado:** aprobado (decisiones de §8 aceptadas). Implementado: capa criptográfica (`core/src/crypto.rs`). Pendiente: lectura/escritura de la cabecera y del archivo.
+> **Estado:** aprobado (decisiones de §8 aceptadas). Implementado completo en el `core`: criptografía (`core/src/crypto.rs`), contenido (`core/src/model.rs`) y archivo (`core/src/vault/`).
 > Cualquier cambio en este documento después de publicar la primera versión de la app exige subir `format_version`.
 
 ## 1. Objetivos
@@ -112,6 +112,8 @@ El descifrado autenticado no permite distinguir entre «contraseña incorrecta»
 | `InvalidPayload` | El tag es válido pero el contenido no cumple el esquema (§5). No debería ocurrir salvo por un error de programación. |
 | `UnsupportedSchema` | `schema` del contenido es más nuevo que el que soporta la app. |
 
+Otros errores de la implementación: `TooLarge` (el contenido supera el máximo al guardar), `EmptyPassword` (contraseña maestra vacía), `AlreadyExists` (no se sobrescribe un archivo existente al crear o exportar), `InvalidPath` e `Io` (solo guarda el tipo de error del sistema de archivos, nunca la ruta).
+
 Ningún mensaje de error incluye contraseñas, claves, contenido descifrado ni la ruta completa del archivo en los logs.
 
 ## 5. Contenido cifrado (payload)
@@ -170,6 +172,15 @@ Si algo falla antes del paso 5, el llavero original queda intacto y se borra el 
 
 **Exportar copia de seguridad:** copiar el archivo cifrado tal cual a la ruta que elija el usuario, con el aviso de que sin la contraseña maestra la copia no sirve.
 
+Detalles de la implementación:
+- **`.bak` sin riesgo de corrupción:** la copia se hace también de forma atómica (`llavero.vault.bak.tmp`, que luego se renombra a `.bak`). Si falla, no se toca el llavero.
+- **Permisos en Unix:** los archivos que se escriben son solo legibles por su propietario (`0600`). En Windows se heredan los permisos de la carpeta del perfil del usuario.
+- **Crear no sobrescribe nunca:** si ya existe un archivo en esa ruta, crear el llavero falla.
+- **Exportar no sobrescribe:** exportar a una ruta existente también falla. Además, la copia corresponde al último estado **guardado**, sin los cambios pendientes.
+- **Cambio de contraseña maestra:** exige la contraseña actual, que se comprueba descifrando el archivo del disco. Genera una sal nueva, permite cambiar los parámetros del KDF y guarda de inmediato.
+- **Tamaño máximo:** al abrir, un archivo de más de 92 bytes + 256 MiB se rechaza sin leerlo.
+- **Pendiente:** no hay bloqueo contra dos instancias de la app escribiendo el mismo llavero a la vez.
+
 ## 7. Evolución del formato
 
 - `format_version` cambia solo si cambia la disposición binaria o la criptografía.
@@ -200,6 +211,9 @@ Todas las propuestas siguientes se aceptaron tal como están.
 | `rand` 0.10 | Sal y nonce | Solo `SysRng` (generador del SO, vía `getrandom`), sin generadores en espacio de usuario. |
 | `zeroize` / `secrecy` | Borrado de secretos en memoria | `secrecy` para la contraseña maestra (`SecretString`). |
 | `thiserror` | Errores tipados | No es criptografía. |
+| `serde` / `serde_json` | Contenido en JSON (§5) | No es criptografía. El JSON se escribe en un búfer de tamaño exacto que se borra al liberarse. |
+| `uuid` | Identificadores de llavero y entradas | Sin generador propio: los UUID v4 se crean con bytes de `SysRng`. |
+| `time` | Fechas RFC 3339 en UTC | No es criptografía. |
 
 En compilaciones de depuración, `argon2` y `blake2` se compilan optimizados (`[profile.dev.package.*]` en el `Cargo.toml` raíz); si no, cada derivación tardaría varios segundos en los tests y en la app en modo desarrollo.
 
@@ -217,4 +231,4 @@ Cuando se implemente, `core` incluirá:
 - Archivos truncados o con bytes extra → error.
 - Parámetros del KDF fuera de límites → `InvalidKdfParams`, sin ejecutar Argon2.
 - Dos guardados seguidos producen nonces distintos.
-- Un **vector de prueba fijo** (archivo `.vault` de ejemplo con una contraseña de prueba conocida y datos ficticios) en `core/tests/data/`, para detectar cambios accidentales del formato.
+- Un **vector de prueba fijo** (archivo `.vault` de ejemplo con una contraseña de prueba conocida y datos ficticios) en `core/tests/data/`, para detectar cambios accidentales del formato. Ya existe: es `core/tests/data/reference-v1.vault` y lo comprueba `core/tests/reference_vault.rs`.

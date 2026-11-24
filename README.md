@@ -2,7 +2,7 @@
 
 Gestor de contraseñas de escritorio para uso interno. Guarda las credenciales de páginas web y programas de forma **local y cifrada**, y las **rellena automáticamente** en ambos. Permite usar contraseñas largas y únicas sin depender de ningún servicio en la nube: la aplicación no se conecta a internet.
 
-> **Estado:** Fase 0 casi terminada y Fase 1 (MVP) en marcha. Ya está la capa de cifrado del `core`; todavía no hay una aplicación usable. Detalle en [Avances](#avances) y en [`informes/`](informes/).
+> **Estado:** Fase 0 casi terminada y Fase 1 (MVP) en marcha. El `core` ya sabe crear, abrir, editar y guardar un llavero cifrado; todavía no hay interfaz ni aplicación usable. Detalle en [Avances](#avances) y en [`informes/`](informes/).
 
 ## Características
 
@@ -10,13 +10,13 @@ Leyenda: ✅ disponible · 🚧 en desarrollo · 📋 prevista
 
 | Característica | Estado |
 |---|---|
-| Llavero local cifrado (`llavero.vault`) protegido con contraseña maestra | 🚧 Fase 1 — cifrado hecho; falta leer/escribir el archivo |
-| Alta, edición y borrado de entradas (nombre, usuario, contraseña, URL/programa, notas) | 📋 Fase 1 |
+| Llavero local cifrado (`llavero.vault`) protegido con contraseña maestra | 🚧 Fase 1 — hecho en el `core`; falta la interfaz |
+| Alta, edición y borrado de entradas (nombre, usuario, contraseña, URL/programa, notas) | 🚧 Fase 1 — hecho en el `core`; falta la interfaz |
 | Generador de contraseñas seguras | 📋 Fase 1 |
 | Copia al portapapeles con limpieza automática (15–30 s) | 📋 Fase 1 |
 | Bloqueo automático por inactividad o al bloquear la sesión de Windows | 📋 Fase 1 |
 | Lista, búsqueda y formulario de entradas | 📋 Fase 1 |
-| Guardado atómico y copia de seguridad del archivo cifrado | 📋 Fase 1 |
+| Guardado atómico y copia de seguridad del archivo cifrado | 🚧 Fase 1 — hecho en el `core`; falta la interfaz |
 | Auto-type en programas con atajo de teclado global | 📋 Fase 2 |
 | Extensión de navegador con autorrelleno y coincidencia exacta de dominio | 📋 Fase 3 |
 | Importación desde navegadores (CSV), carpetas y etiquetas | 📋 Fase 4 |
@@ -106,8 +106,8 @@ Leyenda: ✅ hecho · 🚧 en curso · ⬜ pendiente. Cada avance tiene su infor
 
 **Fase 1 — MVP**
 - ✅ Cifrado: Argon2id + XChaCha20-Poly1305 en `core::crypto` ([0003](informes/0003-2026-11-24-capa-criptografica.md))
-- ⬜ Modelo de entradas (`core::model`)
-- ⬜ Crear/abrir llavero, cabecera del archivo, guardado atómico, `.bak` y exportación (`core::vault`)
+- ✅ Modelo de entradas y búsqueda (`core::model`) ([0005](informes/0005-2026-11-24-modelo-y-archivo-vault.md))
+- ✅ Crear/abrir llavero, cabecera del archivo, guardado atómico, `.bak`, exportación y cambio de contraseña maestra (`core::vault`) ([0005](informes/0005-2026-11-24-modelo-y-archivo-vault.md))
 - ⬜ Generador de contraseñas
 - ⬜ Bloqueo automático y limpieza del portapapeles
 - ⬜ Interfaz con lista, búsqueda y formulario

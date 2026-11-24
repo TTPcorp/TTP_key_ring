@@ -129,7 +129,7 @@ impl Default for KdfParams {
 }
 
 /// Fills `buf` from the operating system CSPRNG.
-fn fill_random(buf: &mut [u8]) -> Result<(), CryptoError> {
+pub(crate) fn fill_random(buf: &mut [u8]) -> Result<(), CryptoError> {
     SysRng
         .try_fill_bytes(buf)
         .map_err(|_| CryptoError::RandomUnavailable)
