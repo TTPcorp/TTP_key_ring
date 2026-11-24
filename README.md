@@ -12,7 +12,7 @@ Leyenda: ✅ disponible · 🚧 en desarrollo · 📋 prevista
 |---|---|
 | Llavero local cifrado (`llavero.vault`) protegido con contraseña maestra | 🚧 Fase 1 — hecho en el `core`; falta la interfaz |
 | Alta, edición y borrado de entradas (nombre, usuario, contraseña, URL/programa, notas) | 🚧 Fase 1 — hecho en el `core`; falta la interfaz |
-| Generador de contraseñas seguras | 📋 Fase 1 |
+| Generador de contraseñas seguras | 🚧 Fase 1 — hecho en el `core`; falta la interfaz |
 | Copia al portapapeles con limpieza automática (15–30 s) | 📋 Fase 1 |
 | Bloqueo automático por inactividad o al bloquear la sesión de Windows | 📋 Fase 1 |
 | Lista, búsqueda y formulario de entradas | 📋 Fase 1 |
@@ -113,7 +113,7 @@ Leyenda: ✅ hecho · 🚧 en curso · ⬜ pendiente. Cada avance tiene su infor
 - ✅ Cifrado: Argon2id + XChaCha20-Poly1305 en `core::crypto` ([0003](informes/0003-2026-11-24-capa-criptografica.md))
 - ✅ Modelo de entradas y búsqueda (`core::model`) ([0005](informes/0005-2026-11-24-modelo-y-archivo-vault.md))
 - ✅ Crear/abrir llavero, cabecera del archivo, guardado atómico, `.bak`, exportación y cambio de contraseña maestra (`core::vault`) ([0005](informes/0005-2026-11-24-modelo-y-archivo-vault.md))
-- ⬜ Generador de contraseñas
+- ✅ Generador de contraseñas (`core::generator`) ([0007](informes/0007-2026-11-24-generador-contrasenas.md))
 - ⬜ Bloqueo automático y limpieza del portapapeles
 - ⬜ Interfaz con lista, búsqueda y formulario
 

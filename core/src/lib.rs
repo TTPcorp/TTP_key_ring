@@ -5,5 +5,6 @@
 //! OS-specific APIs or on Tauri.
 
 pub mod crypto;
+pub mod generator;
 pub mod model;
 pub mod vault;
