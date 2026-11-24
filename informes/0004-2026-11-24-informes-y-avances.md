@@ -2,7 +2,7 @@
 
 - **Fecha:** 2026-11-24
 - **Fase:** 0
-- **Commits:** (este cambio)
+- **Commits:** 7b73eb4
 
 ## Resumen
 A petición del responsable del proyecto, se ha creado la carpeta `informes/` con un informe por cada modificación, y el `README.md` muestra ahora los avances.
