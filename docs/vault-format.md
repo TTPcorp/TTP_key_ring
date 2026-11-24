@@ -1,6 +1,6 @@
 # Formato del archivo `.vault` — versión 1
 
-> **Estado:** borrador para revisión. No hay código que lo implemente todavía.
+> **Estado:** aprobado (decisiones de §8 aceptadas). Implementado: capa criptográfica (`core/src/crypto.rs`). Pendiente: lectura/escritura de la cabecera y del archivo.
 > Cualquier cambio en este documento después de publicar la primera versión de la app exige subir `format_version`.
 
 ## 1. Objetivos
@@ -177,7 +177,9 @@ Si algo falla antes del paso 5, el llavero original queda intacto y se borra el 
 - Al abrir un archivo de una versión anterior soportada, la app lo migra en memoria y lo guarda en la versión actual tras avisar al usuario (la copia `.bak` conserva la versión antigua).
 - No se escriben versiones antiguas (no hay *downgrade*).
 
-## 8. Decisiones abiertas (para revisión)
+## 8. Decisiones (aceptadas)
+
+Todas las propuestas siguientes se aceptaron tal como están.
 
 1. **Normalización Unicode de la contraseña maestra.**
    - **Propuesta:** no normalizar (como KeePassXC). Normalizar a NFC evitaría problemas si la misma contraseña se teclea en sistemas que generan secuencias Unicode distintas (por ejemplo, macOS frente a Windows con tildes), pero añade una dependencia y cambia la contraseña efectiva.
@@ -189,7 +191,21 @@ Si algo falla antes del paso 5, el llavero original queda intacto y se borra el 
    - **Propuesta:** no en la v1. El tamaño del archivo solo revela de forma aproximada cuántos datos hay.
 5. **Parámetros por defecto del KDF** (64 MiB, t=3, p=4) frente a algo más alto, como 256 MiB. Más memoria encarece los ataques por fuerza bruta, pero ralentiza el desbloqueo en equipos modestos.
 
-## 9. Verificación
+## 9. Dependencias criptográficas
+
+| Crate | Para qué | Notas |
+|---|---|---|
+| `argon2` 0.6 | Argon2id (derivación de clave) | RustCrypto. Sin la función `password-hash` (no se necesita formato PHC). Con `zeroize`. |
+| `chacha20poly1305` 0.11 | XChaCha20-Poly1305 | RustCrypto. Con `zeroize` para borrar la clave interna del cifrador. |
+| `rand` 0.10 | Sal y nonce | Solo `SysRng` (generador del SO, vía `getrandom`), sin generadores en espacio de usuario. |
+| `zeroize` / `secrecy` | Borrado de secretos en memoria | `secrecy` para la contraseña maestra (`SecretString`). |
+| `thiserror` | Errores tipados | No es criptografía. |
+
+En compilaciones de depuración, `argon2` y `blake2` se compilan optimizados (`[profile.dev.package.*]` en el `Cargo.toml` raíz); si no, cada derivación tardaría varios segundos en los tests y en la app en modo desarrollo.
+
+Los vectores de regresión de los tests (Argon2id y XChaCha20-Poly1305) se han contrastado con implementaciones independientes: argon2-cffi (implementación de referencia en C) y libsodium.
+
+## 10. Verificación
 
 Cuando se implemente, `core` incluirá:
 
