@@ -46,3 +46,4 @@ Qué se ha hecho y para qué, en dos o tres frases.
 | [0005](0005-2026-11-24-modelo-y-archivo-vault.md) | 2026-11-24 | Modelo de entradas y archivo `.vault` | 1 |
 | [0006](0006-2026-11-24-cierre-fase-0.md) | 2026-11-24 | Cierre de la Fase 0: CI verificada, cargo-deny, Dependabot y framework de interfaz | 0 |
 | [0007](0007-2026-11-24-generador-contrasenas.md) | 2026-11-24 | Generador de contraseñas | 1 |
+| [0008](0008-2026-11-24-app-tauri-svelte.md) | 2026-11-24 | Primera versión de la app de escritorio (Tauri 2 + Svelte 5) | 1 |

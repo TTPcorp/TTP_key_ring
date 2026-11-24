@@ -22,4 +22,12 @@ updates:
       github-actions:
         patterns: ["*"]
 
-  # npm will be added when the Svelte frontend exists.
+  - package-ecosystem: "npm"
+    directory: "/app"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch:
+        update-types: ["minor", "patch"]

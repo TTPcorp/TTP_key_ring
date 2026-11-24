@@ -14,7 +14,7 @@ Local, encrypted desktop password manager with web autofill (browser extension) 
 - **Workspace layout:**
   - `core/` (`llavero-core`): pure, portable logic. No OS or Tauri dependencies. Unit-tested.
   - `platform/` (`llavero-platform`): OS traits + per-OS impls selected with `#[cfg(target_os = "...")]`.
-  - `app/` (`llavero-app`): Tauri application.
+  - `app/` (`llavero-app`): Tauri application. Rust in `app/src/`, Svelte frontend in `app/ui/`, npm project (`package.json`, `.npmrc` with `ignore-scripts`) in `app/`, IPC permissions in `app/capabilities/`.
   - `native-host/` (`llavero-native-host`): Native Messaging bridge.
   - `extension/`: browser extension (not a Rust crate).
 - **Portability rule:** anything OS-specific (global hotkeys, keyboard simulation, active window, clipboard, Native Messaging registration, OS secure storage) goes behind a trait in `platform/`. `core` never calls Windows APIs. Paths always via `std::path` and `dirs`, never hand-written.
@@ -33,10 +33,14 @@ If you think any of the above should change, propose it and wait for confirmatio
   cargo clippy --workspace --all-targets -- -D warnings
   cargo test --workspace
   cargo deny --locked check   # if cargo-deny is installed; CI always runs it
+  # when app/ui or app/package*.json change (run in app/):
+  npm ci && npm audit --audit-level=low && npm run check && npm run build
   ```
 - No network calls from the app or the native host.
+- **Tauri IPC:** every new command must be added to the app manifest in `app/build.rs` and granted explicitly in `app/capabilities/main.json`. Never send passwords or notes to the frontend unless the user explicitly asks to reveal/copy one. Errors reach the UI as codes only. Do not add Tauri plugins or loosen the CSP without asking.
 - **Supply chain:** dependencies only from crates.io (enforced by `deny.toml`); new licenses must be added to `deny.toml` deliberately. GitHub Actions: first-party only, pinned to a full commit SHA with the version in a comment.
 - Security over convenience: when in doubt, choose the safer option.
 - Code and code comments in English; user documentation (README) in Spanish.
 - **Reports (mandatory):** every modification adds a report in `informes/` (Spanish, named `NNNN-YYYY-MM-DD-short-title.md`, following the template in `informes/README.md`), adds it to the index there, and updates the "Avances" section (and the feature table / status line if relevant) of `README.md`. Do this in the same commit as the change.
+- **Pull requests:** `main` is protected. Work on a branch and open a PR. Claude may merge its own PR (merge commit) once every CI check is green, cargo-deny/npm audit report nothing, and there are no conflicts or unresolved review comments; otherwise fix it or report to the project owner first.
 - When instructions are ambiguous or conflict with the repository, ask before deciding.

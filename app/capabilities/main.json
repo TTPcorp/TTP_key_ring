@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "Only the vault commands of LLavero Digital, only for the main window. No core plugins (no file system, shell, HTTP, clipboard...).",
+  "windows": ["main"],
+  "permissions": [
+    "allow-vault-status",
+    "allow-create-vault",
+    "allow-unlock-vault",
+    "allow-lock-vault",
+    "allow-list-entries"
+  ]
+}
