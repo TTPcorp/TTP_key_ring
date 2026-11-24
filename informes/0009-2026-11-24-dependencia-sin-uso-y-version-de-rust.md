@@ -20,6 +20,12 @@ Ni Claude ni la CI lo habían visto, por dos motivos:
   - No se declaran dependencias antes de usarlas.
 - **README:** requisitos actualizados.
 
+- **`.github/dependabot.yml`:** Dependabot ignora TypeScript 7 o superior.
+  - Abrió [TTPcorp/TTP_key_ring#4](https://github.com/TTPcorp/TTP_key_ring/pull/4) para subir TypeScript de 6.0.3 a 7.0.2, y el check `frontend` falló.
+  - El motivo: `svelte-check` 4 solo admite TypeScript 5 y 6. Por eso se fijó la 6 en el informe 0008.
+  - La CI funcionó como debía: bloqueó una actualización incompatible.
+  - La regla se quitará cuando `svelte-check` admita TypeScript 7.
+
 ## Decisiones
 - **Versión exacta en lugar de `stable`:** se gana reproducibilidad (todos ven los mismos avisos y errores) a cambio de tener que subir la versión a mano. Rust publica una versión estable cada 6 semanas. Dependabot no actualiza este archivo, así que se hará en un pull request propio cuando toque.
 - El proyecto sigue en la «edición estable más reciente» de Rust (2024), como dicen las instrucciones. Lo que se fija es la versión del compilador.
@@ -31,4 +37,5 @@ Ni Claude ni la CI lo habían visto, por dos motivos:
 - **Gracias a la prueba en Windows del responsable del proyecto:** los tests también se compilan y ejecutan allí fuera de la CI.
 
 ## Pendiente / siguientes pasos
+- **Cerrar el pull request #4 de Dependabot sin fusionarlo** (tarea del responsable del proyecto).
 - Formulario de entradas (alta, edición y borrado) con el generador integrado.
