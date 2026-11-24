@@ -52,6 +52,8 @@ Extensión navegador  ◄── Native Messaging (local) ──►  App de escri
 | `native-host/` | `llavero-native-host` | Puente Native Messaging entre la extensión y la app. |
 | `extension/` | — | Extensión de navegador (WebExtensions MV3; no es un crate de Rust). |
 
+La especificación del formato del archivo cifrado está en [`docs/vault-format.md`](docs/vault-format.md).
+
 **Regla de portabilidad:** todo lo específico del sistema operativo (atajos globales, simulación de teclado, ventana activa, portapapeles, registro de Native Messaging, almacenamiento seguro del SO) va detrás de un trait en `platform/`, con una implementación por sistema seleccionada con `#[cfg(target_os = "...")]`. El `core` nunca llama a APIs de Windows.
 
 ## Requisitos de desarrollo
@@ -81,7 +83,7 @@ Ejecutar los tests:
 cargo test --workspace
 ```
 
-Comprobaciones antes de enviar cambios:
+Comprobaciones antes de enviar cambios (las mismas que ejecuta la integración continua en Windows y Linux, `.github/workflows/ci.yml`):
 
 ```bash
 cargo fmt --all --check

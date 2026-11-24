@@ -4,3 +4,6 @@
 *.vault
 *.vault.tmp
 .env
+*.vault.bak
+# Fixed test vectors with dummy data only
+!core/tests/data/*.vault
