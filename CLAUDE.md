@@ -38,6 +38,7 @@ If you think any of the above should change, propose it and wait for confirmatio
   ```
 - No network calls from the app or the native host.
 - **Tauri IPC:** every new command must be added to the app manifest in `app/build.rs` and granted explicitly in `app/capabilities/main.json`. Never send passwords or notes to the frontend unless the user explicitly asks to reveal/copy one. Errors reach the UI as codes only. Do not add Tauri plugins or loosen the CSP without asking.
+- **Toolchain:** the exact Rust version is pinned in `rust-toolchain.toml`. Bump it deliberately in its own PR (with report) after checking fmt/clippy/tests on the new version. Cargo manifest lints such as `unused_dependencies` are denied in the workspace `Cargo.toml`: do not declare dependencies before they are used.
 - **Supply chain:** dependencies only from crates.io (enforced by `deny.toml`); new licenses must be added to `deny.toml` deliberately. GitHub Actions: first-party only, pinned to a full commit SHA with the version in a comment.
 - Security over convenience: when in doubt, choose the safer option.
 - Code and code comments in English; user documentation (README) in Spanish.

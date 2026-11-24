@@ -11,6 +11,10 @@ publish = false
 [workspace.lints.rust]
 unsafe_code = "deny"
 
+[workspace.lints.cargo]
+# Manifest warnings are not covered by `clippy -- -D warnings`.
+unused_dependencies = "deny"
+
 [workspace.lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"

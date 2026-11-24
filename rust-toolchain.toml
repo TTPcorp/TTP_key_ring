@@ -1,3 +1,5 @@
 [toolchain]
-channel = "stable"
+# Exact version: CI, developers and Claude must use the same compiler.
+# Bump deliberately (new stable every 6 weeks) in its own PR.
+channel = "1.100.0"
 components = ["rustfmt", "clippy"]
