@@ -203,6 +203,8 @@ Todas las propuestas siguientes se aceptaron tal como están.
 
 En compilaciones de depuración, `argon2` y `blake2` se compilan optimizados (`[profile.dev.package.*]` en el `Cargo.toml` raíz); si no, cada derivación tardaría varios segundos en los tests y en la app en modo desarrollo.
 
+Medición con los parámetros por defecto, en compilación optimizada y en un equipo Linux de 4 núcleos: unos 140 ms con p=4 y unos 130 ms con p=1. Como el coste es bajo, no se activa la opción `parallel` de `argon2`, que añadiría la dependencia `rayon`.
+
 Los vectores de regresión de los tests (Argon2id y XChaCha20-Poly1305) se han contrastado con implementaciones independientes: argon2-cffi (implementación de referencia en C) y libsodium.
 
 ## 10. Verificación

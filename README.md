@@ -2,7 +2,7 @@
 
 Gestor de contraseñas de escritorio para uso interno. Guarda las credenciales de páginas web y programas de forma **local y cifrada**, y las **rellena automáticamente** en ambos. Permite usar contraseñas largas y únicas sin depender de ningún servicio en la nube: la aplicación no se conecta a internet.
 
-> **Estado:** Fase 0 (preparación). Hay un esqueleto de workspace de Cargo; todavía no hay funcionalidad.
+> **Estado:** Fase 0 casi terminada y Fase 1 (MVP) en marcha. Ya está la capa de cifrado del `core`; todavía no hay una aplicación usable. Detalle en [Avances](#avances) y en [`informes/`](informes/).
 
 ## Características
 
@@ -10,7 +10,7 @@ Leyenda: ✅ disponible · 🚧 en desarrollo · 📋 prevista
 
 | Característica | Estado |
 |---|---|
-| Llavero local cifrado (`llavero.vault`) protegido con contraseña maestra | 📋 Fase 1 |
+| Llavero local cifrado (`llavero.vault`) protegido con contraseña maestra | 🚧 Fase 1 — cifrado hecho; falta leer/escribir el archivo |
 | Alta, edición y borrado de entradas (nombre, usuario, contraseña, URL/programa, notas) | 📋 Fase 1 |
 | Generador de contraseñas seguras | 📋 Fase 1 |
 | Copia al portapapeles con limpieza automática (15–30 s) | 📋 Fase 1 |
@@ -92,6 +92,28 @@ cargo clippy --workspace --all-targets -- -D warnings
 
 Lanzar la app en modo desarrollo: *pendiente*. Cuando se integre Tauri será `cargo tauri dev` (requiere `cargo install tauri-cli`). De momento `app/` es un binario vacío.
 
+## Avances
+
+Leyenda: ✅ hecho · 🚧 en curso · ⬜ pendiente. Cada avance tiene su informe en [`informes/`](informes/).
+
+**Fase 0 — Preparación**
+- ✅ Repositorio y workspace de Cargo ([0001](informes/0001-2026-11-24-esqueleto-workspace.md))
+- ✅ README, CLAUDE.md y reglas de contribución ([0001](informes/0001-2026-11-24-esqueleto-workspace.md))
+- ✅ Diseño del formato `.vault` ([0002](informes/0002-2026-11-24-ci-y-formato-vault.md), [`docs/vault-format.md`](docs/vault-format.md))
+- 🚧 CI (build, tests, `clippy`, `fmt`) en Windows y Linux: configurada, pendiente de su primera ejecución ([0002](informes/0002-2026-11-24-ci-y-formato-vault.md))
+- ✅ Carpeta de informes y seguimiento de avances ([0004](informes/0004-2026-11-24-informes-y-avances.md))
+- ⬜ Elegir framework de interfaz
+
+**Fase 1 — MVP**
+- ✅ Cifrado: Argon2id + XChaCha20-Poly1305 en `core::crypto` ([0003](informes/0003-2026-11-24-capa-criptografica.md))
+- ⬜ Modelo de entradas (`core::model`)
+- ⬜ Crear/abrir llavero, cabecera del archivo, guardado atómico, `.bak` y exportación (`core::vault`)
+- ⬜ Generador de contraseñas
+- ⬜ Bloqueo automático y limpieza del portapapeles
+- ⬜ Interfaz con lista, búsqueda y formulario
+
+**Fases 2–4:** sin empezar.
+
 ## Hoja de ruta
 
 Importancia: **Crítica** (bloquea lo demás o compromete la seguridad) · **Alta** · **Media** · **Baja**.
@@ -130,6 +152,7 @@ Importancia: **Crítica** (bloquea lo demás o compromete la seguridad) · **Alt
 - Todo cambio en `core` va acompañado de tests. `cargo fmt`, `cargo clippy -- -D warnings` y `cargo test` deben pasar antes de dar una tarea por terminada.
 - Ninguna llamada de red desde la app ni desde el native host.
 - Código y comentarios en inglés; documentación de usuario en español.
+- Cada cambio añade un informe en [`informes/`](informes/) (ver la plantilla en su README) y actualiza la sección [Avances](#avances) de este README.
 
 Como referencia de buenas prácticas (formato de archivo, integración con navegador, auto-type) se puede consultar KeePassXC, pero no se copia su código.
 

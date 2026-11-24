@@ -36,4 +36,5 @@ If you think any of the above should change, propose it and wait for confirmatio
 - No network calls from the app or the native host.
 - Security over convenience: when in doubt, choose the safer option.
 - Code and code comments in English; user documentation (README) in Spanish.
+- **Reports (mandatory):** every modification adds a report in `informes/` (Spanish, named `NNNN-YYYY-MM-DD-short-title.md`, following the template in `informes/README.md`), adds it to the index there, and updates the "Avances" section (and the feature table / status line if relevant) of `README.md`. Do this in the same commit as the change.
 - When instructions are ambiguous or conflict with the repository, ask before deciding.

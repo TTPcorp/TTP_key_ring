@@ -1,0 +1,45 @@
+# Informes de cambios
+
+Cada modificación del proyecto deja aquí un informe. Así se puede seguir qué se ha hecho, por qué y cómo se ha comprobado, sin tener que leer el código ni el historial de git.
+
+## Convenciones
+
+- **Nombre:** `NNNN-AAAA-MM-DD-titulo-corto.md`. `NNNN` es un número correlativo de 4 cifras.
+- **Un informe por cambio** (normalmente, uno por commit o grupo de commits de una misma tarea).
+- **Idioma:** español.
+- **Sin secretos:** nunca se incluyen contraseñas, claves ni datos reales.
+- **Índice:** cada informe nuevo se añade a la tabla de abajo, y los avances se reflejan también en el `README.md` principal.
+
+## Plantilla
+
+```markdown
+# NNNN — Título
+
+- **Fecha:** AAAA-MM-DD
+- **Fase:** 0 / 1 / 2 / 3 / 4
+- **Commits:** abc1234
+
+## Resumen
+Qué se ha hecho y para qué, en dos o tres frases.
+
+## Cambios
+- Archivos o módulos tocados y qué se ha cambiado en cada uno.
+
+## Decisiones
+- Decisiones tomadas y su motivo. Indicar si las aprobó el responsable del proyecto.
+
+## Verificación
+- Qué se ha comprobado (tests, fmt, clippy, CI, pruebas manuales) y el resultado.
+
+## Pendiente / siguientes pasos
+- Lo que queda abierto.
+```
+
+## Índice
+
+| Nº | Fecha | Título | Fase |
+|---|---|---|---|
+| [0001](0001-2026-11-24-esqueleto-workspace.md) | 2026-11-24 | Esqueleto del workspace, README y CLAUDE.md | 0 |
+| [0002](0002-2026-11-24-ci-y-formato-vault.md) | 2026-11-24 | Integración continua y especificación del formato `.vault` | 0 |
+| [0003](0003-2026-11-24-capa-criptografica.md) | 2026-11-24 | Capa criptográfica del `core` | 1 |
+| [0004](0004-2026-11-24-informes-y-avances.md) | 2026-11-24 | Carpeta de informes y seguimiento de avances en el README | 0 |
