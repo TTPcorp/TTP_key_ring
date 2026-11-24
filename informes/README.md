@@ -44,3 +44,4 @@ Qué se ha hecho y para qué, en dos o tres frases.
 | [0003](0003-2026-11-24-capa-criptografica.md) | 2026-11-24 | Capa criptográfica del `core` | 1 |
 | [0004](0004-2026-11-24-informes-y-avances.md) | 2026-11-24 | Carpeta de informes y seguimiento de avances en el README | 0 |
 | [0005](0005-2026-11-24-modelo-y-archivo-vault.md) | 2026-11-24 | Modelo de entradas y archivo `.vault` | 1 |
+| [0006](0006-2026-11-24-cierre-fase-0.md) | 2026-11-24 | Cierre de la Fase 0: CI verificada, cargo-deny, Dependabot y framework de interfaz | 0 |
