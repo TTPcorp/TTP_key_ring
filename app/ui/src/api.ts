@@ -15,7 +15,44 @@ export interface EntrySummary {
   urls: string[];
 }
 
-/** Error codes returned by the backend (see AppError in commands.rs). */
+export interface EntryDetails {
+  id: string;
+  name: string;
+  username: string;
+  urls: string[];
+  hasPassword: boolean;
+  hasNotes: boolean;
+}
+
+/**
+ * Entry form sent to the backend. A `null` password or notes means
+ * "not touched": on update the stored value is kept.
+ */
+export interface EntryForm {
+  name: string;
+  username: string;
+  password: string | null;
+  urls: string[];
+  notes: string | null;
+}
+
+export type SecretField = "password" | "notes";
+
+export interface GeneratorOptions {
+  length: number;
+  lowercase: boolean;
+  uppercase: boolean;
+  digits: boolean;
+  symbols: boolean;
+  excludeAmbiguous: boolean;
+}
+
+export interface GeneratedPassword {
+  password: string;
+  entropyBits: number;
+}
+
+/** Error codes returned by the backend (see AppError in state.rs). */
 export type ErrorCode =
   | "NotAVault"
   | "UnsupportedVersion"
@@ -25,6 +62,9 @@ export type ErrorCode =
   | "EmptyPassword"
   | "AlreadyExists"
   | "Locked"
+  | "EmptyName"
+  | "EntryNotFound"
+  | "InvalidGeneratorOptions"
   | "Io"
   | "Internal";
 
@@ -37,6 +77,10 @@ const messages: Record<ErrorCode, string> = {
   EmptyPassword: "La contraseña maestra no puede estar vacía.",
   AlreadyExists: "Ya existe un llavero en esa ubicación.",
   Locked: "El llavero está bloqueado.",
+  EmptyName: "El nombre de la entrada no puede estar vacío.",
+  EntryNotFound: "La entrada ya no existe.",
+  InvalidGeneratorOptions:
+    "Opciones del generador no válidas: elige al menos un tipo de carácter y una longitud suficiente.",
   Io: "No se ha podido leer o escribir el archivo del llavero.",
   Internal: "Error interno de la aplicación.",
 };
@@ -57,3 +101,13 @@ export const createVault = (password: string) => invoke<void>("create_vault", { 
 export const unlockVault = (password: string) => invoke<void>("unlock_vault", { password });
 export const lockVault = () => invoke<void>("lock_vault");
 export const listEntries = (query: string) => invoke<EntrySummary[]>("list_entries", { query });
+export const getEntry = (id: string) => invoke<EntryDetails>("get_entry", { id });
+/** Only call on an explicit user action ("Mostrar"). */
+export const revealSecret = (id: string, field: SecretField) =>
+  invoke<string>("reveal_secret", { id, field });
+export const addEntry = (entry: EntryForm) => invoke<string>("add_entry", { entry });
+export const updateEntry = (id: string, entry: EntryForm) =>
+  invoke<void>("update_entry", { id, entry });
+export const deleteEntry = (id: string) => invoke<void>("delete_entry", { id });
+export const generatePassword = (options: GeneratorOptions) =>
+  invoke<GeneratedPassword>("generate_password", { options });

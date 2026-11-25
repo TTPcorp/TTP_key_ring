@@ -8,6 +8,12 @@
     "allow-create-vault",
     "allow-unlock-vault",
     "allow-lock-vault",
-    "allow-list-entries"
+    "allow-list-entries",
+    "allow-get-entry",
+    "allow-reveal-secret",
+    "allow-add-entry",
+    "allow-update-entry",
+    "allow-delete-entry",
+    "allow-generate-password"
   ]
 }

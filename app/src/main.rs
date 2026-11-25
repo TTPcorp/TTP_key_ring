@@ -22,6 +22,12 @@ fn main() {
             commands::unlock_vault,
             commands::lock_vault,
             commands::list_entries,
+            commands::get_entry,
+            commands::reveal_secret,
+            commands::add_entry,
+            commands::update_entry,
+            commands::delete_entry,
+            commands::generate_password,
         ])
         .run(tauri::generate_context!());
 
