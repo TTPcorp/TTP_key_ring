@@ -77,6 +77,38 @@ export const webWarningMessages: Record<WebWarning, string> = {
   looksLikeProgram: "Parece el nombre de un programa, no una dirección web.",
 };
 
+export type StrengthWarning =
+  | "containsEntryData"
+  | "commonPassword"
+  | "keyboardPattern"
+  | "repeats"
+  | "sequence"
+  | "dates"
+  | "singleWord"
+  | "names";
+
+export interface StrengthEstimate {
+  bits: number;
+  warning: StrengthWarning | null;
+}
+
+export interface StrengthContext {
+  name: string;
+  username: string;
+  urls: string[];
+}
+
+export const strengthWarningMessages: Record<StrengthWarning, string> = {
+  containsEntryData: "Contiene el nombre, el usuario o la web de la entrada: es lo primero que se prueba.",
+  commonPassword: "Es una contraseña muy común o muy parecida a una.",
+  keyboardPattern: "Sigue un patrón del teclado (como «qwerty»).",
+  repeats: "Repite caracteres o bloques (como «aaa» o «abcabc»).",
+  sequence: "Contiene secuencias (como «abc» o «1234»).",
+  dates: "Contiene fechas o años, fáciles de adivinar.",
+  singleWord: "Una sola palabra es fácil de adivinar.",
+  names: "Contiene nombres o apellidos comunes.",
+};
+
 /** Error codes returned by the backend (see AppError in state.rs). */
 export type ErrorCode =
   | "NotAVault"
@@ -143,6 +175,9 @@ export const updateEntry = (id: string, entry: EntryForm) =>
 /** Requires the master password, as a guard against accidental deletes. */
 export const deleteEntry = (id: string, password: string) =>
   invoke<void>("delete_entry", { id, password });
+/** Estimates the strength of a password being typed (never stored). */
+export const estimateStrength = (password: string, context: StrengthContext) =>
+  invoke<StrengthEstimate>("estimate_strength", { password, context });
 export const checkUrl = (input: string) => invoke<WebAddressInfo>("check_url", { input });
 export const generatePassword = (options: GeneratorOptions) =>
   invoke<GeneratedPassword>("generate_password", { options });

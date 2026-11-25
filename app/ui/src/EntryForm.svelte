@@ -5,12 +5,15 @@
     checkUrl,
     deleteEntry,
     errorMessage,
+    estimateStrength,
     generatePassword,
     getEntry,
     revealSecret,
+    strengthWarningMessages,
     updateEntry,
     webWarningMessages,
     type GeneratorOptions,
+    type StrengthEstimate,
     type WebAddressInfo,
   } from "./api";
   import StrengthMeter from "./StrengthMeter.svelte";
@@ -54,6 +57,34 @@
   });
   let entropyBits = $state<number | null>(null);
   let generatedLength = $state(0);
+
+  // Live estimate for typed (or revealed) passwords. Generated ones use
+  // their exact entropy instead.
+  let estimate = $state<StrengthEstimate | null>(null);
+  let estimateTimer: ReturnType<typeof setTimeout> | undefined;
+  let estimateSeq = 0;
+
+  function scheduleEstimate() {
+    clearTimeout(estimateTimer);
+    const seq = ++estimateSeq;
+    if (password === "") {
+      estimate = null;
+      return;
+    }
+    estimateTimer = setTimeout(async () => {
+      try {
+        const result = await estimateStrength(password, {
+          name,
+          username,
+          urls: urlsText.split("\n"),
+        });
+        // Ignore answers to older keystrokes.
+        if (seq === estimateSeq) estimate = result;
+      } catch {
+        if (seq === estimateSeq) estimate = null;
+      }
+    }, 150);
+  }
 
   /** Generator presets: entropy targets (powers of two) or a fixed length. */
   const targets: { value: number | null; label: string }[] = [
@@ -116,6 +147,7 @@
   // Best effort: do not leave secrets in the page state after closing.
   onDestroy(() => {
     clearTimeout(urlTimer);
+    clearTimeout(estimateTimer);
     password = "";
     notes = "";
     masterPassword = "";
@@ -133,6 +165,7 @@
       try {
         password = await revealSecret(id, "password");
         passwordTouched = true;
+        scheduleEstimate();
       } catch (err) {
         error = errorMessage(err);
         return;
@@ -158,6 +191,9 @@
       password = generated.password;
       entropyBits = generated.entropyBits;
       generatedLength = generated.length;
+      clearTimeout(estimateTimer);
+      estimateSeq++;
+      estimate = null;
       passwordTouched = true;
       showPassword = true;
     } catch (err) {
@@ -242,6 +278,7 @@
             oninput={() => {
               passwordTouched = true;
               entropyBits = null;
+              scheduleEstimate();
             }}
             placeholder={editing && hasPassword && !passwordTouched
               ? "•••••••• (sin cambios)"
@@ -260,6 +297,12 @@
         {#if entropyBits !== null && passwordTouched}
           <StrengthMeter bits={entropyBits} />
           <p class="hint">Contraseña generada de {generatedLength} caracteres.</p>
+        {:else if estimate !== null && password !== ""}
+          <StrengthMeter
+            bits={estimate.bits}
+            estimated
+            warning={estimate.warning ? strengthWarningMessages[estimate.warning] : null}
+          />
         {/if}
         <button
           type="button"

@@ -1,9 +1,13 @@
 <script lang="ts">
   interface Props {
-    /** Estimated entropy of the password, in bits. */
+    /** Entropy of the password, in bits. */
     bits: number;
+    /** True for typed passwords (estimate), false for generated (exact). */
+    estimated?: boolean;
+    /** Main weakness found, already as a user-facing message. */
+    warning?: string | null;
   }
-  let { bits }: Props = $props();
+  let { bits, estimated = false, warning = null }: Props = $props();
 
   /** Full bar at 128 bits, the default generator target. */
   const FULL = 128;
@@ -41,6 +45,11 @@
         />
       </svg>
     {/if}
-    Seguridad {label} · {Math.round(bits)} bits
+    Seguridad {label} · {estimated ? "unos " : ""}{Math.round(bits)} bits{estimated
+      ? " (estimación)"
+      : ""}
   </span>
+  {#if warning}
+    <span class="hint">⚠ {warning}</span>
+  {/if}
 </div>

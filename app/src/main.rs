@@ -29,6 +29,7 @@ fn main() {
             commands::delete_entry,
             commands::generate_password,
             commands::check_url,
+            commands::estimate_strength,
         ])
         .run(tauri::generate_context!());
 

@@ -1,5 +1,13 @@
 <script lang="ts">
-  import { createVault, unlockVault, errorMessage } from "./api";
+  import {
+    createVault,
+    unlockVault,
+    errorMessage,
+    estimateStrength,
+    strengthWarningMessages,
+    type StrengthEstimate,
+  } from "./api";
+  import StrengthMeter from "./StrengthMeter.svelte";
 
   interface Props {
     exists: boolean;
@@ -15,6 +23,29 @@
   let acknowledged = $state(false);
   let busy = $state(false);
   let error = $state("");
+
+  // Strength of the new master password, while typing (create only).
+  let estimate = $state<StrengthEstimate | null>(null);
+  let estimateTimer: ReturnType<typeof setTimeout> | undefined;
+  let estimateSeq = 0;
+
+  function scheduleEstimate() {
+    if (exists) return;
+    clearTimeout(estimateTimer);
+    const seq = ++estimateSeq;
+    if (password === "") {
+      estimate = null;
+      return;
+    }
+    estimateTimer = setTimeout(async () => {
+      try {
+        const result = await estimateStrength(password, { name: "", username: "", urls: [] });
+        if (seq === estimateSeq) estimate = result;
+      } catch {
+        if (seq === estimateSeq) estimate = null;
+      }
+    }, 150);
+  }
 
   const createProblem = $derived.by(() => {
     if (password.length < MIN_MASTER_LENGTH) {
@@ -48,6 +79,9 @@
       // Best effort: do not keep the password around in the page state.
       password = "";
       confirmation = "";
+      clearTimeout(estimateTimer);
+      estimateSeq++;
+      estimate = null;
       busy = false;
     }
   }
@@ -72,11 +106,20 @@
         type="password"
         bind:value={password}
         autocomplete={exists ? "current-password" : "new-password"}
+        oninput={scheduleEstimate}
         autofocus
         required
         disabled={busy}
       />
     </label>
+
+    {#if !exists && estimate !== null && password !== ""}
+      <StrengthMeter
+        bits={estimate.bits}
+        estimated
+        warning={estimate.warning ? strengthWarningMessages[estimate.warning] : null}
+      />
+    {/if}
 
     {#if !exists}
       <label>

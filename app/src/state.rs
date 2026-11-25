@@ -7,6 +7,7 @@ use std::sync::Mutex;
 use llavero_core::crypto::KdfParams;
 use llavero_core::generator::{self, GeneratorError, PasswordOptions};
 use llavero_core::model::{Entry, EntryInput, ModelError, VaultData};
+use llavero_core::strength::{self, StrengthEstimate};
 use llavero_core::vault::{Vault, VaultError};
 use llavero_core::web::{self, WebAddressError, WebWarning};
 use secrecy::{ExposeSecret, SecretString};
@@ -200,6 +201,51 @@ pub fn generate_password(form: GeneratorForm) -> Result<GeneratedPassword, AppEr
         entropy_bits: generator::entropy_bits(&options),
         length: options.length,
     })
+}
+
+/// Fields of the entry being edited, used to detect passwords that
+/// contain the entry's own data (name, user name, site).
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StrengthContext {
+    pub name: String,
+    pub username: String,
+    pub urls: Vec<String>,
+}
+
+/// Parts of the URL or of an e-mail that say nothing about the person.
+const CONTEXT_STOPWORDS: &[&str] = &["http", "https", "www", "mail", "login"];
+
+/// Words an attacker targeting this entry would try: the whole fields
+/// and their alphanumeric pieces of 4+ characters.
+fn context_words(ctx: &StrengthContext) -> Vec<String> {
+    let mut words: Vec<String> = Vec::new();
+    let fields = [ctx.name.as_str(), ctx.username.as_str()]
+        .into_iter()
+        .chain(ctx.urls.iter().map(String::as_str));
+    for field in fields {
+        let field = field.trim().to_lowercase();
+        let pieces = field
+            .split(|c: char| !c.is_alphanumeric())
+            .map(str::to_owned)
+            .chain(std::iter::once(field.clone()));
+        for piece in pieces {
+            if piece.chars().count() >= 4
+                && !CONTEXT_STOPWORDS.contains(&piece.as_str())
+                && !words.contains(&piece)
+            {
+                words.push(piece);
+            }
+        }
+    }
+    words
+}
+
+/// Estimates the strength of a password the user is typing.
+pub fn estimate_strength(password: &SecretString, ctx: &StrengthContext) -> StrengthEstimate {
+    let words = context_words(ctx);
+    let words: Vec<&str> = words.iter().map(String::as_str).collect();
+    strength::estimate(password, &words)
 }
 
 /// Result of checking one web address, for live feedback in the form.
@@ -853,6 +899,37 @@ mod tests {
             check_url("not a site").unwrap_err(),
             AppError::NotAWebAddress
         );
+    }
+
+    #[test]
+    fn strength_uses_the_entry_data() {
+        let ctx = StrengthContext {
+            name: "Banco Santander".into(),
+            username: "maria.lopez@example.com".into(),
+            urls: vec!["https://www.bancosantander.es/".into()],
+        };
+        let words = context_words(&ctx);
+        for w in [
+            "banco",
+            "santander",
+            "maria",
+            "lopez",
+            "maria.lopez@example.com",
+        ] {
+            assert!(words.contains(&w.to_owned()), "{w} in {words:?}");
+        }
+        for w in ["www", "https", "es"] {
+            assert!(!words.contains(&w.to_owned()), "{w} in {words:?}");
+        }
+        let weak = estimate_strength(&pw("Santander2024!"), &ctx);
+        assert_eq!(
+            weak.warning,
+            Some(llavero_core::strength::StrengthWarning::ContainsEntryData)
+        );
+        let strong = estimate_strength(&pw("kQ7#mZ2!pL9@xW4$tR8&"), &ctx);
+        assert!(strong.bits > 100.0);
+        let json = serde_json::to_string(&weak).unwrap();
+        assert!(json.contains(r#""warning":"containsEntryData""#));
     }
 
     #[test]
