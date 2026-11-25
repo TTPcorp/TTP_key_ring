@@ -5,17 +5,18 @@
 //! storage) is exposed here as a trait, with one implementation per OS
 //! selected via `#[cfg(target_os = "...")]`.
 
+pub mod clipboard;
+
+pub use clipboard::{Clipboard, ClipboardError, SystemClipboard, clear_if_unchanged};
+
 #[cfg(target_os = "windows")]
-mod windows;
+#[path = "windows.rs"]
+mod os;
 
 #[cfg(target_os = "linux")]
-mod linux;
+#[path = "linux.rs"]
+mod os;
 
 #[cfg(target_os = "macos")]
-mod macos;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn crate_compiles() {}
-}
+#[path = "macos.rs"]
+mod os;

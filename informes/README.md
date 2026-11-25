@@ -50,3 +50,4 @@ Qué se ha hecho y para qué, en dos o tres frases.
 | [0009](0009-2026-11-24-dependencia-sin-uso-y-version-de-rust.md) | 2026-11-24 | Dependencia sin uso y versión de Rust fijada | 1 |
 | [0010](0010-2026-11-25-formulario-entradas.md) | 2026-11-25 | Formulario de entradas y generador en la app | 1 |
 | [0011](0011-2026-11-25-mejoras-formulario.md) | 2026-11-25 | Modo oscuro, generador por entropía, barra de seguridad (también al escribir), borrado con contraseña y comprobación de webs | 1 |
+| [0012](0012-2026-11-25-portapapeles.md) | 2026-11-25 | Copiar usuario y contraseña al portapapeles con borrado automático | 1 |

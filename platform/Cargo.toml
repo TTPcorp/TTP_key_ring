@@ -7,6 +7,9 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+arboard = { version = "3", default-features = false }
+thiserror = "2"
+zeroize = "1.9"
 
 [lints]
 workspace = true

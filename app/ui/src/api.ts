@@ -125,6 +125,8 @@ export type ErrorCode =
   | "NotAWebAddress"
   | "UnsupportedScheme"
   | "EmbeddedCredentials"
+  | "ClipboardUnavailable"
+  | "NothingToCopy"
   | "Io"
   | "Internal";
 
@@ -143,6 +145,8 @@ const messages: Record<ErrorCode, string> = {
     "Opciones del generador no válidas: elige al menos un tipo de carácter y una longitud suficiente.",
   NotAWebAddress: "Hay una dirección que no es una web válida.",
   UnsupportedScheme: "Solo se admiten direcciones web http o https.",
+  ClipboardUnavailable: "No se ha podido usar el portapapeles. Inténtalo de nuevo.",
+  NothingToCopy: "Esta entrada no tiene ese dato.",
   EmbeddedCredentials:
     "Hay una dirección con «usuario@» delante del dominio, un truco típico de suplantación. Quítalo.",
   Io: "No se ha podido leer o escribir el archivo del llavero.",
@@ -181,3 +185,7 @@ export const estimateStrength = (password: string, context: StrengthContext) =>
 export const checkUrl = (input: string) => invoke<WebAddressInfo>("check_url", { input });
 export const generatePassword = (options: GeneratorOptions) =>
   invoke<GeneratedPassword>("generate_password", { options });
+export type CopyField = "username" | "password";
+/** Copies in Rust (the value never reaches the page); returns the seconds until it is cleared. */
+export const copyToClipboard = (id: string, field: CopyField) =>
+  invoke<number>("copy_to_clipboard", { id, field });
