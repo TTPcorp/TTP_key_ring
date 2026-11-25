@@ -3,9 +3,13 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
+export type LockReason = "inactivity" | "sessionLocked";
+
 export interface VaultStatus {
   exists: boolean;
   unlocked: boolean;
+  /** Set when the vault was locked automatically. */
+  lockReason: LockReason | null;
 }
 
 export interface EntrySummary {
@@ -189,3 +193,5 @@ export type CopyField = "username" | "password";
 /** Copies in Rust (the value never reaches the page); returns the seconds until it is cleared. */
 export const copyToClipboard = (id: string, field: CopyField) =>
   invoke<number>("copy_to_clipboard", { id, field });
+/** Postpones the inactivity lock (call throttled on user input). */
+export const userActivity = () => invoke<void>("user_activity");

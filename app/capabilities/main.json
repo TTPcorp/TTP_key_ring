@@ -17,6 +17,7 @@
     "allow-generate-password",
     "allow-check-url",
     "allow-estimate-strength",
-    "allow-copy-to-clipboard"
+    "allow-copy-to-clipboard",
+    "allow-user-activity"
   ]
 }

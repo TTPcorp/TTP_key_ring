@@ -5,15 +5,23 @@
     errorMessage,
     estimateStrength,
     strengthWarningMessages,
+    type LockReason,
     type StrengthEstimate,
   } from "./api";
   import StrengthMeter from "./StrengthMeter.svelte";
 
   interface Props {
     exists: boolean;
+    /** Why the vault was locked automatically, if it was. */
+    lockReason?: LockReason | null;
     onUnlocked: () => void;
   }
-  let { exists, onUnlocked }: Props = $props();
+  let { exists, lockReason = null, onUnlocked }: Props = $props();
+
+  const lockMessages: Record<LockReason, string> = {
+    inactivity: "El llavero se ha bloqueado tras 5 minutos sin actividad.",
+    sessionLocked: "El llavero se ha bloqueado al bloquear la sesión de Windows.",
+  };
 
   /** Minimum length required by the UI when creating a vault. */
   const MIN_MASTER_LENGTH = 12;
@@ -89,6 +97,10 @@
 
 <section class="card narrow">
   <h1>LLavero Digital</h1>
+
+  {#if exists && lockReason}
+    <p class="notice" role="status">🔒 {lockMessages[lockReason]}</p>
+  {/if}
 
   {#if exists}
     <p class="muted">Introduce tu contraseña maestra para abrir el llavero.</p>

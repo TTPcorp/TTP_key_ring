@@ -21,6 +21,7 @@ fn main() {
             "check_url",
             "estimate_strength",
             "copy_to_clipboard",
+            "user_activity",
         ]));
     if let Err(error) = tauri_build::try_build(attributes) {
         eprintln!("tauri build script failed: {error:#}");

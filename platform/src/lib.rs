@@ -6,8 +6,10 @@
 //! selected via `#[cfg(target_os = "...")]`.
 
 pub mod clipboard;
+pub mod session;
 
 pub use clipboard::{Clipboard, ClipboardError, SystemClipboard, clear_if_unchanged};
+pub use session::is_session_locked;
 
 #[cfg(target_os = "windows")]
 #[path = "windows.rs"]
