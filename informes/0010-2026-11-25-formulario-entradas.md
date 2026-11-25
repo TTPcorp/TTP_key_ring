@@ -1,4 +1,4 @@
-# 0009 — Formulario de entradas y generador en la app
+# 0010 — Formulario de entradas y generador en la app
 
 - **Fecha:** 2026-11-25
 - **Fase:** 1
@@ -9,7 +9,7 @@ Ya se pueden **añadir, editar y borrar entradas desde la app**, con el **genera
 
 | Lista | Editar entrada | Contraseña generada |
 |---|---|---|
-| ![Lista](img/0009-lista.png) | ![Editar entrada](img/0009-editar.png) | ![Generador](img/0009-generador.png) |
+| ![Lista](img/0010-lista.png) | ![Editar entrada](img/0010-editar.png) | ![Generador](img/0010-generador.png) |
 
 *Capturas de la interfaz compilada en un navegador (Chromium) con el backend de Tauri simulado y datos de prueba.*
 

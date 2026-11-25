@@ -142,10 +142,10 @@ Leyenda: ✅ hecho · 🚧 en curso · ⬜ pendiente. Cada avance tiene su infor
 - ✅ Cifrado: Argon2id + XChaCha20-Poly1305 en `core::crypto` ([0003](informes/0003-2026-11-24-capa-criptografica.md))
 - ✅ Modelo de entradas y búsqueda (`core::model`) ([0005](informes/0005-2026-11-24-modelo-y-archivo-vault.md))
 - ✅ Crear/abrir llavero, cabecera del archivo, guardado atómico, `.bak`, exportación y cambio de contraseña maestra (`core::vault`) ([0005](informes/0005-2026-11-24-modelo-y-archivo-vault.md))
-- ✅ Generador de contraseñas (`core::generator`) ([0007](informes/0007-2026-11-24-generador-contrasenas.md)), integrado en el formulario de la app ([0009](informes/0009-2026-11-25-formulario-entradas.md))
+- ✅ Generador de contraseñas (`core::generator`) ([0007](informes/0007-2026-11-24-generador-contrasenas.md)), integrado en el formulario de la app ([0010](informes/0010-2026-11-25-formulario-entradas.md))
 - ⬜ Bloqueo automático y limpieza del portapapeles
 - ✅ Interfaz: app Tauri 2 + Svelte con crear/abrir llavero, lista, búsqueda y bloqueo manual ([0008](informes/0008-2026-11-24-app-tauri-svelte.md))
-- ✅ Formulario de entradas en la app: añadir, editar y borrar, con generador y secretos solo bajo petición ([0009](informes/0009-2026-11-25-formulario-entradas.md))
+- ✅ Formulario de entradas en la app: añadir, editar y borrar, con generador y secretos solo bajo petición ([0010](informes/0010-2026-11-25-formulario-entradas.md))
 
 **Fases 2–4:** sin empezar.
 
