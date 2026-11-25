@@ -2,7 +2,7 @@
 
 Gestor de contraseñas de escritorio para uso interno. Guarda las credenciales de páginas web y programas de forma **local y cifrada**, y las **rellena automáticamente** en ambos. Permite usar contraseñas largas y únicas sin depender de ningún servicio en la nube: la aplicación no se conecta a internet.
 
-> **Estado:** Fases 0 y 1 (MVP) terminadas. La app de escritorio permite crear o abrir el llavero cifrado; ver, buscar, añadir, editar y borrar entradas (con generador por entropía, barra de seguridad también mientras se escribe y comprobación de direcciones web); copiar el usuario o la contraseña al portapapeles con borrado automático; cambiar entre tema claro y oscuro; y bloquearlo a mano, tras 5 minutos sin actividad o al bloquear la sesión de Windows. Siguiente: Fase 2 (auto-type en programas). Detalle en [Avances](#avances) y en [`informes/`](informes/).
+> **Estado:** Fases 0 y 1 (MVP) terminadas. La app de escritorio permite crear o abrir el llavero cifrado; ver, buscar, añadir, editar y borrar entradas (con generador por entropía, barra de seguridad también mientras se escribe y comprobación de direcciones web); copiar el usuario o la contraseña al portapapeles con borrado automático; cambiar entre tema claro y oscuro; y bloquearlo a mano, tras 5 minutos sin actividad o al bloquear la sesión de Windows. En curso: Fase 2 (auto-type en programas); ya están las secuencias y la asociación de entradas con ventanas. Detalle en [Avances](#avances) y en [`informes/`](informes/).
 
 ## Características
 
@@ -21,7 +21,7 @@ Leyenda: ✅ disponible · 🚧 en desarrollo · 📋 prevista
 | Comprobación sin conexión de direcciones web (formato, http, IP, caracteres engañosos) | ✅ Fase 1 |
 | Borrado de entradas protegido con la contraseña maestra | ✅ Fase 1 |
 | Guardado atómico y copia de seguridad automática (`.bak`) del archivo cifrado | ✅ Fase 1 (exportar una copia desde la app: menú de ajustes, Fase 4) |
-| Auto-type en programas con atajo de teclado global | 📋 Fase 2 |
+| Auto-type en programas con atajo de teclado global | 🚧 Fase 2 (secuencias y asociación con ventanas en el `core`) |
 | Extensión de navegador con autorrelleno y coincidencia exacta de dominio | 📋 Fase 3 |
 | Importación desde navegadores (CSV), carpetas y etiquetas | 📋 Fase 4 |
 | Auditoría de contraseñas débiles o repetidas | 📋 Fase 4 |
@@ -50,7 +50,7 @@ Extensión navegador  ◄── Native Messaging (local) ──►  App de escri
 
 | Carpeta | Crate | Responsabilidad |
 |---|---|---|
-| `core/` | `llavero-core` | Lógica pura y portable: formato del llavero, cifrado, modelo de entradas, generador de contraseñas, estimación de la fuerza de contraseñas, comprobación de direcciones web, búsqueda y coincidencia. Sin dependencias del SO ni de Tauri. Con tests unitarios. |
+| `core/` | `llavero-core` | Lógica pura y portable: formato del llavero, cifrado, modelo de entradas, generador de contraseñas, estimación de la fuerza de contraseñas, comprobación de direcciones web, secuencias de auto-type, búsqueda y coincidencia. Sin dependencias del SO ni de Tauri. Con tests unitarios. |
 | `platform/` | `llavero-platform` | Traits comunes e implementaciones por sistema (`windows` ahora; `linux` y `macos` en el futuro). Ya incluye el portapapeles y la detección de sesión bloqueada. |
 | `app/` | `llavero-app` | Aplicación Tauri: interfaz y comandos. |
 | `native-host/` | `llavero-native-host` | Puente Native Messaging entre la extensión y la app. |
@@ -156,7 +156,13 @@ Leyenda: ✅ hecho · 🚧 en curso · ⬜ pendiente. Cada avance tiene su infor
 
 **Fase 1 terminada** (2026-11-25). Cambiar la contraseña maestra y exportar una copia de seguridad ya funcionan en el `core`, pero su botón en la app irá en el menú de ajustes (Fase 4).
 
-**Fases 2–4:** sin empezar.
+**Fase 2 — Auto-type en programas**
+- ✅ Secuencias de auto-type (por defecto `{USERNAME}{TAB}{PASSWORD}{ENTER}`) y asociación de entradas con ventanas (título con comodín `*`, nombre del ejecutable) en `core::autotype` ([0015](informes/0015-2026-11-25-secuencias-auto-type.md))
+- ⬜ Traits de plataforma e implementación para Windows: ventana activa, escritura simulada y atajo global
+- ⬜ Auto-type en la app y campos de ventanas y secuencia en el formulario
+- ⬜ Comprobación de los programas asociados (ejecutable y firma digital)
+
+**Fases 3–4:** sin empezar.
 
 ## Hoja de ruta
 
