@@ -28,6 +28,7 @@ fn main() {
             commands::update_entry,
             commands::delete_entry,
             commands::generate_password,
+            commands::check_url,
         ])
         .run(tauri::generate_context!());
 

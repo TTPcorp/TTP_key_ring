@@ -39,6 +39,8 @@ export interface EntryForm {
 export type SecretField = "password" | "notes";
 
 export interface GeneratorOptions {
+  /** Entropy target (64, 128, 256...); `null` means a fixed `length`. */
+  targetBits: number | null;
   length: number;
   lowercase: boolean;
   uppercase: boolean;
@@ -50,7 +52,30 @@ export interface GeneratorOptions {
 export interface GeneratedPassword {
   password: string;
   entropyBits: number;
+  length: number;
 }
+
+export type WebWarning =
+  | "notEncrypted"
+  | "ipAddress"
+  | "lookalikeCharacters"
+  | "singleLabelHost"
+  | "looksLikeProgram";
+
+export interface WebAddressInfo {
+  url: string;
+  host: string;
+  warnings: WebWarning[];
+}
+
+export const webWarningMessages: Record<WebWarning, string> = {
+  notEncrypted: "Usa http: la conexión no va cifrada. Comprueba si existe la versión https.",
+  ipAddress: "Es una dirección IP, no un nombre de dominio. Asegúrate de que es el equipo correcto.",
+  lookalikeCharacters:
+    "El dominio tiene caracteres especiales que pueden imitar a otra web (por ejemplo, una «а» cirílica en lugar de una «a»). Comprueba que es la web real.",
+  singleLabelHost: "Nombre sin dominio: solo funciona dentro de una red local.",
+  looksLikeProgram: "Parece el nombre de un programa, no una dirección web.",
+};
 
 /** Error codes returned by the backend (see AppError in state.rs). */
 export type ErrorCode =
@@ -65,6 +90,9 @@ export type ErrorCode =
   | "EmptyName"
   | "EntryNotFound"
   | "InvalidGeneratorOptions"
+  | "NotAWebAddress"
+  | "UnsupportedScheme"
+  | "EmbeddedCredentials"
   | "Io"
   | "Internal";
 
@@ -81,6 +109,10 @@ const messages: Record<ErrorCode, string> = {
   EntryNotFound: "La entrada ya no existe.",
   InvalidGeneratorOptions:
     "Opciones del generador no válidas: elige al menos un tipo de carácter y una longitud suficiente.",
+  NotAWebAddress: "Hay una dirección que no es una web válida.",
+  UnsupportedScheme: "Solo se admiten direcciones web http o https.",
+  EmbeddedCredentials:
+    "Hay una dirección con «usuario@» delante del dominio, un truco típico de suplantación. Quítalo.",
   Io: "No se ha podido leer o escribir el archivo del llavero.",
   Internal: "Error interno de la aplicación.",
 };
@@ -108,6 +140,9 @@ export const revealSecret = (id: string, field: SecretField) =>
 export const addEntry = (entry: EntryForm) => invoke<string>("add_entry", { entry });
 export const updateEntry = (id: string, entry: EntryForm) =>
   invoke<void>("update_entry", { id, entry });
-export const deleteEntry = (id: string) => invoke<void>("delete_entry", { id });
+/** Requires the master password, as a guard against accidental deletes. */
+export const deleteEntry = (id: string, password: string) =>
+  invoke<void>("delete_entry", { id, password });
+export const checkUrl = (input: string) => invoke<WebAddressInfo>("check_url", { input });
 export const generatePassword = (options: GeneratorOptions) =>
   invoke<GeneratedPassword>("generate_password", { options });

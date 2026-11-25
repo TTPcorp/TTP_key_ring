@@ -8,7 +8,7 @@ use tauri::State;
 
 use crate::state::{
     self, AppError, AppState, EntryDetails, EntryForm, EntrySummary, GeneratedPassword,
-    GeneratorForm, Revealed, SecretField, VaultStatus,
+    GeneratorForm, Revealed, SecretField, VaultStatus, WebAddressInfo,
 };
 
 #[tauri::command]
@@ -75,12 +75,22 @@ pub fn update_entry(
     state.update(&id, entry)
 }
 
+/// Asks for the master password: runs Argon2, so it is `async`.
 #[tauri::command]
-pub fn delete_entry(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
-    state.delete(&id)
+pub async fn delete_entry(
+    state: State<'_, AppState>,
+    id: String,
+    password: SecretString,
+) -> Result<(), AppError> {
+    state.delete(&id, &password)
 }
 
 #[tauri::command]
 pub fn generate_password(options: GeneratorForm) -> Result<GeneratedPassword, AppError> {
     state::generate_password(options)
+}
+
+#[tauri::command]
+pub fn check_url(input: String) -> Result<WebAddressInfo, AppError> {
+    state::check_url(&input)
 }

@@ -9,11 +9,19 @@
   --danger: #b42318;
   --warning-bg: #fff6e5;
   --warning-border: #f0c36d;
+  --strength-0: #d92d20;
+  --strength-1: #e8590c;
+  --strength-2: #d99a00;
+  --strength-3: #66a80f;
+  --strength-4: #2b8a3e;
+  --strength-5: #1c64f2;
+  --track: #e4e7ec;
   color-scheme: light;
 }
 
+/* Dark theme: follows Windows unless the user picked one (data-theme). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #12161c;
     --surface: #1b2129;
     --text: #e6e9ee;
@@ -24,8 +32,36 @@
     --danger: #f97066;
     --warning-bg: #2b2414;
     --warning-border: #8a6d2a;
+    --strength-0: #f97066;
+    --strength-1: #fd853a;
+    --strength-2: #fdb022;
+    --strength-3: #a6d96a;
+    --strength-4: #47cd89;
+    --strength-5: #6b9bff;
+    --track: #2d3540;
     color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #12161c;
+  --surface: #1b2129;
+  --text: #e6e9ee;
+  --muted: #9aa4b2;
+  --border: #2d3540;
+  --accent: #6b8ff2;
+  --accent-text: #0d1117;
+  --danger: #f97066;
+  --warning-bg: #2b2414;
+  --warning-border: #8a6d2a;
+  --strength-0: #f97066;
+  --strength-1: #fd853a;
+  --strength-2: #fdb022;
+  --strength-3: #a6d96a;
+  --strength-4: #47cd89;
+  --strength-5: #6b9bff;
+  --track: #2d3540;
+  color-scheme: dark;
 }
 
 * {
@@ -259,4 +295,148 @@ label.inline input {
 
 .empty {
   text-align: center;
+}
+
+select {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-weight: 400;
+}
+
+/* Theme switch (top right). */
+.theme-switch {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0;
+  margin-bottom: 12px;
+}
+
+.theme-switch button {
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.85rem;
+}
+
+.theme-switch button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.theme-switch button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.theme-switch button + button {
+  border-left: none;
+}
+
+.theme-switch button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+/* Password strength bar: red → green, blue with a shield when very high. */
+.strength {
+  display: grid;
+  gap: 4px;
+  --level: var(--strength-0);
+}
+
+.strength.level-1 {
+  --level: var(--strength-1);
+}
+.strength.level-2 {
+  --level: var(--strength-2);
+}
+.strength.level-3 {
+  --level: var(--strength-3);
+}
+.strength.level-4 {
+  --level: var(--strength-4);
+}
+.strength.level-5 {
+  --level: var(--strength-5);
+}
+
+.strength progress {
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  border: none;
+  border-radius: 4px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.strength progress::-webkit-progress-bar {
+  background: var(--track);
+  border-radius: 4px;
+}
+
+.strength progress::-webkit-progress-value {
+  background: var(--level);
+  border-radius: 4px;
+  transition: width 0.25s ease;
+}
+
+.strength progress::-moz-progress-bar {
+  background: var(--level);
+  border-radius: 4px;
+}
+
+.strength-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--level);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* Offline web address checks. */
+.url-checks {
+  display: grid;
+  gap: 4px;
+  margin: -8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+
+.url-checks li {
+  display: grid;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+
+.good {
+  color: var(--strength-4);
+}
+
+.warn {
+  color: var(--strength-1);
+  font-weight: 600;
+}
+
+.bad {
+  color: var(--danger);
+}
+
+.delete-confirm {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+}
+
+.delete-confirm p {
+  margin: 0;
 }

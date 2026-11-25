@@ -18,6 +18,7 @@ fn main() {
             "update_entry",
             "delete_entry",
             "generate_password",
+            "check_url",
         ]));
     if let Err(error) = tauri_build::try_build(attributes) {
         eprintln!("tauri build script failed: {error:#}");

@@ -2,14 +2,18 @@
   import { onDestroy, onMount } from "svelte";
   import {
     addEntry,
+    checkUrl,
     deleteEntry,
     errorMessage,
     generatePassword,
     getEntry,
     revealSecret,
     updateEntry,
+    webWarningMessages,
     type GeneratorOptions,
+    type WebAddressInfo,
   } from "./api";
+  import StrengthMeter from "./StrengthMeter.svelte";
 
   interface Props {
     /** Entry to edit, or `null` to create a new one. */
@@ -40,6 +44,7 @@
 
   let generatorOpen = $state(false);
   let options = $state<GeneratorOptions>({
+    targetBits: 128,
     length: 20,
     lowercase: true,
     uppercase: true,
@@ -48,7 +53,44 @@
     excludeAmbiguous: false,
   });
   let entropyBits = $state<number | null>(null);
+  let generatedLength = $state(0);
 
+  /** Generator presets: entropy targets (powers of two) or a fixed length. */
+  const targets: { value: number | null; label: string }[] = [
+    { value: 64, label: "64 bits" },
+    { value: 128, label: "128 bits (recomendado)" },
+    { value: 256, label: "256 bits" },
+    { value: null, label: "Longitud fija" },
+  ];
+
+  // Offline check of each web address, refreshed while typing.
+  type UrlCheck = { line: string; info?: WebAddressInfo; error?: string };
+  let urlChecks = $state<UrlCheck[]>([]);
+  let urlTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function scheduleUrlCheck() {
+    clearTimeout(urlTimer);
+    urlTimer = setTimeout(runUrlCheck, 300);
+  }
+
+  async function runUrlCheck() {
+    const lines = urlsText
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l !== "");
+    urlChecks = await Promise.all(
+      lines.map(async (line): Promise<UrlCheck> => {
+        try {
+          return { line, info: await checkUrl(line) };
+        } catch (err) {
+          return { line, error: errorMessage(err) };
+        }
+      }),
+    );
+  }
+
+  let masterPassword = $state("");
+  let deleteError = $state("");
   let busy = $state(false);
   let error = $state("");
   let confirmingDelete = $state(false);
@@ -63,6 +105,7 @@
       urlsText = entry.urls.join("\n");
       hasPassword = entry.hasPassword;
       hasNotes = entry.hasNotes;
+      runUrlCheck();
     } catch (err) {
       error = errorMessage(err);
     } finally {
@@ -72,8 +115,10 @@
 
   // Best effort: do not leave secrets in the page state after closing.
   onDestroy(() => {
+    clearTimeout(urlTimer);
     password = "";
     notes = "";
+    masterPassword = "";
   });
 
   /** True while the stored notes exist but have not been revealed. */
@@ -112,18 +157,12 @@
       const generated = await generatePassword(options);
       password = generated.password;
       entropyBits = generated.entropyBits;
+      generatedLength = generated.length;
       passwordTouched = true;
       showPassword = true;
     } catch (err) {
       error = errorMessage(err);
     }
-  }
-
-  function strengthLabel(bits: number): string {
-    if (bits >= 100) return "muy fuerte";
-    if (bits >= 75) return "fuerte";
-    if (bits >= 50) return "aceptable";
-    return "débil";
   }
 
   async function save(event: SubmitEvent) {
@@ -152,19 +191,26 @@
     }
   }
 
-  async function remove() {
-    if (id === null || busy) return;
+  async function remove(event: SubmitEvent) {
+    event.preventDefault();
+    if (id === null || busy || masterPassword === "") return;
     busy = true;
-    error = "";
+    deleteError = "";
     try {
-      await deleteEntry(id);
+      await deleteEntry(id, masterPassword);
       onClose(true);
     } catch (err) {
-      error = errorMessage(err);
-      confirmingDelete = false;
+      deleteError = errorMessage(err);
     } finally {
+      masterPassword = "";
       busy = false;
     }
+  }
+
+  function cancelDelete() {
+    confirmingDelete = false;
+    masterPassword = "";
+    deleteError = "";
   }
 </script>
 
@@ -193,7 +239,10 @@
             id="entry-password"
             type={showPassword ? "text" : "password"}
             bind:value={password}
-            oninput={() => (passwordTouched = true)}
+            oninput={() => {
+              passwordTouched = true;
+              entropyBits = null;
+            }}
             placeholder={editing && hasPassword && !passwordTouched
               ? "•••••••• (sin cambios)"
               : ""}
@@ -209,11 +258,8 @@
           </button>
         </div>
         {#if entropyBits !== null && passwordTouched}
-          <p class="hint">
-            Contraseña generada: unos {Math.round(entropyBits)} bits de entropía ({strengthLabel(
-              entropyBits,
-            )}).
-          </p>
+          <StrengthMeter bits={entropyBits} />
+          <p class="hint">Contraseña generada de {generatedLength} caracteres.</p>
         {/if}
         <button
           type="button"
@@ -227,9 +273,21 @@
           <fieldset class="generator">
             <legend>Generador</legend>
             <label class="inline">
-              Longitud
-              <input type="number" min="8" max="256" bind:value={options.length} />
+              Seguridad
+              <select bind:value={options.targetBits}>
+                {#each targets as target (target.label)}
+                  <option value={target.value}>{target.label}</option>
+                {/each}
+              </select>
             </label>
+            {#if options.targetBits === null}
+              <label class="inline">
+                Longitud
+                <input type="number" min="8" max="256" bind:value={options.length} />
+              </label>
+            {:else}
+              <p class="hint">La longitud se calcula para llegar a esa seguridad.</p>
+            {/if}
             <label class="check">
               <input type="checkbox" bind:checked={options.lowercase} /> Minúsculas (a-z)
             </label>
@@ -254,12 +312,31 @@
         Direcciones web (una por línea)
         <textarea
           bind:value={urlsText}
+          oninput={scheduleUrlCheck}
           rows="2"
           spellcheck="false"
           placeholder="https://ejemplo.com"
           disabled={busy}
         ></textarea>
       </label>
+      {#if urlChecks.length > 0}
+        <ul class="url-checks" aria-live="polite">
+          {#each urlChecks as check, i (i)}
+            <li>
+              {#if check.error}
+                <span class="bad">✗ {check.line}: {check.error}</span>
+              {:else if check.info && check.info.warnings.length > 0}
+                <span class="warn">⚠ {check.info.host}</span>
+                {#each check.info.warnings as warning (warning)}
+                  <span class="hint">{webWarningMessages[warning]}</span>
+                {/each}
+              {:else if check.info}
+                <span class="good">✓ {check.info.host}</span>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
 
       <div class="field">
         <label for="entry-notes">Notas</label>
@@ -292,20 +369,7 @@
         </button>
         {#if editing}
           <span class="grow"></span>
-          {#if confirmingDelete}
-            <span class="hint">¿Borrar definitivamente?</span>
-            <button type="button" class="danger" onclick={remove} disabled={busy}>
-              Sí, borrar
-            </button>
-            <button
-              type="button"
-              class="secondary"
-              onclick={() => (confirmingDelete = false)}
-              disabled={busy}
-            >
-              No
-            </button>
-          {:else}
+          {#if !confirmingDelete}
             <button
               type="button"
               class="danger-outline"
@@ -318,5 +382,37 @@
         {/if}
       </div>
     </form>
+
+    {#if confirmingDelete}
+      <form class="delete-confirm" onsubmit={remove}>
+        <p>
+          <strong>¿Borrar «{name}» definitivamente?</strong> No se puede deshacer. Escribe tu contraseña
+          maestra para confirmarlo.
+        </p>
+        <label>
+          Contraseña maestra
+          <!-- svelte-ignore a11y_autofocus -->
+          <input
+            type="password"
+            bind:value={masterPassword}
+            autocomplete="current-password"
+            autofocus
+            required
+            disabled={busy}
+          />
+        </label>
+        {#if deleteError}
+          <p class="error" role="alert">{deleteError}</p>
+        {/if}
+        <div class="actions">
+          <button type="submit" class="danger" disabled={busy || masterPassword === ""}>
+            {busy ? "Comprobando…" : "Borrar definitivamente"}
+          </button>
+          <button type="button" class="secondary" onclick={cancelDelete} disabled={busy}>
+            Cancelar
+          </button>
+        </div>
+      </form>
+    {/if}
   {/if}
 </section>

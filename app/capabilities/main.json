@@ -14,6 +14,7 @@
     "allow-add-entry",
     "allow-update-entry",
     "allow-delete-entry",
-    "allow-generate-password"
+    "allow-generate-password",
+    "allow-check-url"
   ]
 }
