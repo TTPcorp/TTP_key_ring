@@ -68,7 +68,8 @@ Ya se pueden **añadir, editar y borrar entradas desde la app**, con el **genera
 - **Prueba de la interfaz** en Chromium con Playwright y el backend simulado. Se ha recorrido abrir una entrada, generar contraseña, guardar, crear otra entrada y borrarla, sin errores en la consola. Se ha comprobado que:
   - No se llama a `reveal_secret` sin pulsar «Mostrar».
   - Las notas sin tocar se envían como `null`.
-- `cargo deny` no está instalado en el entorno de desarrollo usado; lo ejecuta la CI. No hay dependencias nuevas.
+- `cargo deny --locked check`: advisories, bans, licenses y sources correctos.
+- Comprobaciones de Rust repetidas con **Rust 1.100.0** (la versión fijada en el informe 0009) tras integrar `main`: todo correcto.
 
 ## Pendiente / siguientes pasos
 - **Copiar el usuario o la contraseña** al portapapeles, con limpieza automática (trait de portapapeles en `platform/`).

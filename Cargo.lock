@@ -1961,7 +1961,6 @@ version = "0.1.0"
 dependencies = [
  "dirs",
  "llavero-core",
- "llavero-platform",
  "secrecy",
  "serde",
  "serde_json",
