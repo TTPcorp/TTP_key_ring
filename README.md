@@ -149,6 +149,7 @@ Leyenda: ✅ hecho · 🚧 en curso · ⬜ pendiente. Cada avance tiene su infor
 - ✅ Generador de contraseñas (`core::generator`) ([0007](informes/0007-2026-11-24-generador-contrasenas.md)), integrado en el formulario de la app ([0010](informes/0010-2026-11-25-formulario-entradas.md))
 - ✅ Copia al portapapeles con borrado automático a los 20 s, al bloquear y al cerrar, fuera del historial de Windows ([0012](informes/0012-2026-11-25-portapapeles.md))
 - ✅ Bloqueo automático tras 5 minutos sin actividad y al bloquear la sesión de Windows ([0013](informes/0013-2026-11-25-bloqueo-automatico.md))
+- ✅ Portapapeles y bloqueo automático verificados a mano en Windows ([0014](informes/0014-2026-11-25-verificacion-manual-windows.md))
 - ✅ Interfaz: app Tauri 2 + Svelte con crear/abrir llavero, lista, búsqueda y bloqueo manual ([0008](informes/0008-2026-11-24-app-tauri-svelte.md))
 - ✅ Formulario de entradas en la app: añadir, editar y borrar, con generador y secretos solo bajo petición ([0010](informes/0010-2026-11-25-formulario-entradas.md))
 - ✅ Modo oscuro, generador por entropía (128 bits por defecto), barra de seguridad (también al escribir, con zxcvbn), borrado con contraseña maestra y comprobación de webs sin conexión ([0011](informes/0011-2026-11-25-mejoras-formulario.md))

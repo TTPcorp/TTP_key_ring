@@ -52,3 +52,4 @@ Qué se ha hecho y para qué, en dos o tres frases.
 | [0011](0011-2026-11-25-mejoras-formulario.md) | 2026-11-25 | Modo oscuro, generador por entropía, barra de seguridad (también al escribir), borrado con contraseña y comprobación de webs | 1 |
 | [0012](0012-2026-11-25-portapapeles.md) | 2026-11-25 | Copiar usuario y contraseña al portapapeles con borrado automático | 1 |
 | [0013](0013-2026-11-25-bloqueo-automatico.md) | 2026-11-25 | Bloqueo automático por inactividad y al bloquear la sesión de Windows (cierre de la Fase 1) | 1 |
+| [0014](0014-2026-11-25-verificacion-manual-windows.md) | 2026-11-25 | Verificación manual en Windows del portapapeles y del bloqueo automático | 1 |
