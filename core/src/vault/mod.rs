@@ -305,6 +305,15 @@ impl Vault {
         Ok(())
     }
 
+    /// Checks `password` against the master password of the file on disk,
+    /// for confirming sensitive actions. Runs the full key derivation, so
+    /// it is as slow (and as hard to brute-force) as opening the vault.
+    pub fn verify_password(&self, password: &SecretString) -> Result<(), VaultError> {
+        check_password(password)?;
+        decode(&read_vault_file(&self.path)?, password)?;
+        Ok(())
+    }
+
     /// Copies the encrypted file, as last saved, to `destination`.
     /// Refuses to overwrite an existing file. Unsaved changes are not
     /// included: call [`Vault::save`] first if needed.
@@ -552,6 +561,21 @@ mod tests {
         );
         let reopened = Vault::open(&path, &pw("new")).unwrap();
         assert_eq!(reopened.kdf_params(), stronger);
+    }
+
+    #[test]
+    fn verify_password() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_, vault) = new_vault(dir.path());
+        assert!(vault.verify_password(&pw("master")).is_ok());
+        assert!(matches!(
+            vault.verify_password(&pw("wrong password")),
+            Err(VaultError::WrongPasswordOrCorrupted)
+        ));
+        assert!(matches!(
+            vault.verify_password(&pw("")),
+            Err(VaultError::EmptyPassword)
+        ));
     }
 
     #[test]

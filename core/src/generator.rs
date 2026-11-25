@@ -116,6 +116,48 @@ pub fn entropy_bits(options: &PasswordOptions) -> f64 {
     options.length as f64 * (size as f64).log2()
 }
 
+/// Entropy target used when the user does not choose one. A power of two,
+/// like the other usual targets (64, 128, 256).
+pub const DEFAULT_TARGET_BITS: u32 = 128;
+
+/// Shortest length whose estimated entropy (see [`entropy_bits`]) reaches
+/// `target_bits` with the character classes of `options`; its `length`
+/// field is ignored.
+///
+/// When `require_each_class` is on, one extra bit is required to cover
+/// the small overestimate of [`entropy_bits`], so the real entropy never
+/// falls below the target. The result is at least
+/// [`PasswordOptions::MIN_LENGTH`].
+pub fn length_for_entropy(
+    options: &PasswordOptions,
+    target_bits: u32,
+) -> Result<usize, GeneratorError> {
+    let classes = classes(options);
+    let size: usize = classes.iter().map(Vec::len).sum();
+    if size == 0 {
+        return Err(GeneratorError::NoCharacterClass);
+    }
+    let bits_per_char = (size as f64).log2();
+    if bits_per_char <= 0.0 {
+        return Err(GeneratorError::InvalidLength);
+    }
+    let margin = if options.require_each_class { 1.0 } else { 0.0 };
+    let needed = ((f64::from(target_bits) + margin) / bits_per_char).ceil();
+    if needed > PasswordOptions::MAX_LENGTH as f64 {
+        return Err(GeneratorError::InvalidLength);
+    }
+    // In range [0, MAX_LENGTH] after the check above.
+    let length =
+        (needed as usize)
+            .max(PasswordOptions::MIN_LENGTH)
+            .max(if options.require_each_class {
+                classes.len()
+            } else {
+                0
+            });
+    Ok(length)
+}
+
 /// Adapter that lets rand's infallible sampling run on the fallible OS
 /// RNG without panicking: the first error is recorded and zeros are
 /// returned from then on. The caller must check [`Self::failed`] and
@@ -343,6 +385,84 @@ mod tests {
         // 89 degrees of freedom: mean 89, p(chi2 > 200) is astronomically small.
         assert!(chi2 < 200.0, "chi2 = {chi2}");
         assert!(alphabet.iter().all(|&c| counts[c as usize] > 0));
+    }
+
+    #[test]
+    fn length_for_usual_entropy_targets() {
+        // 90 characters: about 6.49 bits each.
+        let all = PasswordOptions::default();
+        assert_eq!(length_for_entropy(&all, 64).unwrap(), 11);
+        assert_eq!(length_for_entropy(&all, DEFAULT_TARGET_BITS).unwrap(), 20);
+        assert_eq!(length_for_entropy(&all, 256).unwrap(), 40);
+        // Digits only: about 3.32 bits each.
+        let digits = PasswordOptions {
+            lowercase: false,
+            uppercase: false,
+            symbols: false,
+            ..all
+        };
+        assert_eq!(length_for_entropy(&digits, 128).unwrap(), 39);
+    }
+
+    #[test]
+    fn length_for_entropy_is_the_shortest_that_reaches_the_target() {
+        let variants = [
+            PasswordOptions::default(),
+            PasswordOptions {
+                symbols: false,
+                exclude_ambiguous: true,
+                ..PasswordOptions::default()
+            },
+            PasswordOptions {
+                uppercase: false,
+                digits: false,
+                symbols: false,
+                require_each_class: false,
+                ..PasswordOptions::default()
+            },
+        ];
+        for base in variants {
+            for target in [32, 64, 100, 128, 200, 256, 512] {
+                let length = length_for_entropy(&base, target).unwrap();
+                let margin = if base.require_each_class { 1.0 } else { 0.0 };
+                let goal = f64::from(target) + margin;
+                let with = |n| entropy_bits(&PasswordOptions { length: n, ..base });
+                assert!(with(length) >= goal, "{target} bits, length {length}");
+                assert!(
+                    length == PasswordOptions::MIN_LENGTH || with(length - 1) < goal,
+                    "{target} bits: {length} is not the shortest"
+                );
+                // And the generator accepts it.
+                let pw = generate(&PasswordOptions { length, ..base }).unwrap();
+                assert_eq!(pw.expose_secret().len(), length);
+            }
+        }
+    }
+
+    #[test]
+    fn length_for_entropy_limits() {
+        let all = PasswordOptions::default();
+        // Tiny targets still give the minimum length.
+        assert_eq!(
+            length_for_entropy(&all, 1).unwrap(),
+            PasswordOptions::MIN_LENGTH
+        );
+        // Unreachable targets are an error, not a truncated password.
+        assert_eq!(
+            length_for_entropy(&all, 4096).unwrap_err(),
+            GeneratorError::InvalidLength
+        );
+        let none = PasswordOptions {
+            lowercase: false,
+            uppercase: false,
+            digits: false,
+            symbols: false,
+            ..all
+        };
+        assert_eq!(
+            length_for_entropy(&none, 128).unwrap_err(),
+            GeneratorError::NoCharacterClass
+        );
     }
 
     #[test]

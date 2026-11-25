@@ -3,6 +3,7 @@
   import { vaultStatus, errorMessage, type VaultStatus } from "./api";
   import Unlock from "./Unlock.svelte";
   import VaultView from "./VaultView.svelte";
+  import ThemeSwitch from "./ThemeSwitch.svelte";
 
   let status = $state<VaultStatus | null>(null);
   let loadError = $state("");
@@ -20,6 +21,7 @@
 </script>
 
 <main>
+  <ThemeSwitch />
   {#if loadError}
     <p class="error" role="alert">{loadError}</p>
   {:else if status === null}

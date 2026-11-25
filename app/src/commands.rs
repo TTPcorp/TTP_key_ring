@@ -3,12 +3,13 @@
 //! Commands that run Argon2 are `async` so they execute off the main
 //! thread and never freeze the window.
 
+use llavero_core::strength::StrengthEstimate;
 use secrecy::SecretString;
 use tauri::State;
 
 use crate::state::{
     self, AppError, AppState, EntryDetails, EntryForm, EntrySummary, GeneratedPassword,
-    GeneratorForm, Revealed, SecretField, VaultStatus,
+    GeneratorForm, Revealed, SecretField, StrengthContext, VaultStatus, WebAddressInfo,
 };
 
 #[tauri::command]
@@ -75,12 +76,32 @@ pub fn update_entry(
     state.update(&id, entry)
 }
 
+/// Asks for the master password: runs Argon2, so it is `async`.
 #[tauri::command]
-pub fn delete_entry(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
-    state.delete(&id)
+pub async fn delete_entry(
+    state: State<'_, AppState>,
+    id: String,
+    password: SecretString,
+) -> Result<(), AppError> {
+    state.delete(&id, &password)
 }
 
 #[tauri::command]
 pub fn generate_password(options: GeneratorForm) -> Result<GeneratedPassword, AppError> {
     state::generate_password(options)
+}
+
+#[tauri::command]
+pub fn check_url(input: String) -> Result<WebAddressInfo, AppError> {
+    state::check_url(&input)
+}
+
+/// Strength of the password being typed. `async` so that the analysis
+/// never blocks the window while typing.
+#[tauri::command]
+pub async fn estimate_strength(
+    password: SecretString,
+    context: StrengthContext,
+) -> Result<StrengthEstimate, AppError> {
+    Ok(state::estimate_strength(&password, &context))
 }

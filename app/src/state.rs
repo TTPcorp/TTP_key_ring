@@ -7,7 +7,9 @@ use std::sync::Mutex;
 use llavero_core::crypto::KdfParams;
 use llavero_core::generator::{self, GeneratorError, PasswordOptions};
 use llavero_core::model::{Entry, EntryInput, ModelError, VaultData};
+use llavero_core::strength::{self, StrengthEstimate};
 use llavero_core::vault::{Vault, VaultError};
+use llavero_core::web::{self, WebAddressError, WebWarning};
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize, Serializer};
 
@@ -27,6 +29,9 @@ pub enum AppError {
     EmptyName,
     EntryNotFound,
     InvalidGeneratorOptions,
+    NotAWebAddress,
+    UnsupportedScheme,
+    EmbeddedCredentials,
     Io,
     Internal,
 }
@@ -37,6 +42,16 @@ impl From<ModelError> for AppError {
             ModelError::EmptyName => Self::EmptyName,
             ModelError::NotFound => Self::EntryNotFound,
             ModelError::Crypto(_) => Self::Internal,
+        }
+    }
+}
+
+impl From<WebAddressError> for AppError {
+    fn from(e: WebAddressError) -> Self {
+        match e {
+            WebAddressError::NotAWebAddress => Self::NotAWebAddress,
+            WebAddressError::UnsupportedScheme => Self::UnsupportedScheme,
+            WebAddressError::EmbeddedCredentials => Self::EmbeddedCredentials,
         }
     }
 }
@@ -137,9 +152,13 @@ impl Serialize for Revealed {
 }
 
 /// Password generator options chosen in the UI.
+///
+/// With `target_bits` set (64, 128, 256...), the length is the shortest
+/// that reaches that entropy and `length` is ignored.
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GeneratorForm {
+    pub target_bits: Option<u32>,
     pub length: usize,
     pub lowercase: bool,
     pub uppercase: bool,
@@ -168,23 +187,96 @@ impl From<GeneratorForm> for PasswordOptions {
 pub struct GeneratedPassword {
     pub password: Revealed,
     pub entropy_bits: f64,
+    pub length: usize,
 }
 
 /// Generates a password with the given options.
 pub fn generate_password(form: GeneratorForm) -> Result<GeneratedPassword, AppError> {
-    let options = PasswordOptions::from(form);
+    let mut options = PasswordOptions::from(form);
+    if let Some(bits) = form.target_bits {
+        options.length = generator::length_for_entropy(&options, bits)?;
+    }
     Ok(GeneratedPassword {
         password: Revealed(generator::generate(&options)?),
         entropy_bits: generator::entropy_bits(&options),
+        length: options.length,
     })
 }
 
-/// Trims text fields and drops blank URL lines.
-fn clean_urls(urls: Vec<String>) -> Vec<String> {
-    urls.into_iter()
-        .map(|u| u.trim().to_owned())
-        .filter(|u| !u.is_empty())
-        .collect()
+/// Fields of the entry being edited, used to detect passwords that
+/// contain the entry's own data (name, user name, site).
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StrengthContext {
+    pub name: String,
+    pub username: String,
+    pub urls: Vec<String>,
+}
+
+/// Parts of the URL or of an e-mail that say nothing about the person.
+const CONTEXT_STOPWORDS: &[&str] = &["http", "https", "www", "mail", "login"];
+
+/// Words an attacker targeting this entry would try: the whole fields
+/// and their alphanumeric pieces of 4+ characters.
+fn context_words(ctx: &StrengthContext) -> Vec<String> {
+    let mut words: Vec<String> = Vec::new();
+    let fields = [ctx.name.as_str(), ctx.username.as_str()]
+        .into_iter()
+        .chain(ctx.urls.iter().map(String::as_str));
+    for field in fields {
+        let field = field.trim().to_lowercase();
+        let pieces = field
+            .split(|c: char| !c.is_alphanumeric())
+            .map(str::to_owned)
+            .chain(std::iter::once(field.clone()));
+        for piece in pieces {
+            if piece.chars().count() >= 4
+                && !CONTEXT_STOPWORDS.contains(&piece.as_str())
+                && !words.contains(&piece)
+            {
+                words.push(piece);
+            }
+        }
+    }
+    words
+}
+
+/// Estimates the strength of a password the user is typing.
+pub fn estimate_strength(password: &SecretString, ctx: &StrengthContext) -> StrengthEstimate {
+    let words = context_words(ctx);
+    let words: Vec<&str> = words.iter().map(String::as_str).collect();
+    strength::estimate(password, &words)
+}
+
+/// Result of checking one web address, for live feedback in the form.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct WebAddressInfo {
+    pub url: String,
+    pub host: String,
+    pub warnings: Vec<WebWarning>,
+}
+
+/// Checks a web address without any network access.
+pub fn check_url(input: &str) -> Result<WebAddressInfo, AppError> {
+    let checked = web::check_web_address(input)?;
+    Ok(WebAddressInfo {
+        url: checked.url,
+        host: checked.host,
+        warnings: checked.warnings,
+    })
+}
+
+/// Drops blank lines, then checks and normalizes every web address.
+/// Any invalid address rejects the whole form; duplicates are removed.
+fn clean_urls(urls: Vec<String>) -> Result<Vec<String>, AppError> {
+    let mut clean: Vec<String> = Vec::new();
+    for raw in urls.iter().filter(|u| !u.trim().is_empty()) {
+        let url = web::check_web_address(raw)?.url;
+        if !clean.contains(&url) {
+            clean.push(url);
+        }
+    }
+    Ok(clean)
 }
 
 /// Finds an entry by the string id the frontend got from the list.
@@ -315,7 +407,7 @@ impl AppState {
                 form.username.trim(),
                 form.password.unwrap_or_else(|| SecretString::from("")),
             );
-            input.urls = clean_urls(form.urls);
+            input.urls = clean_urls(form.urls)?;
             if let Some(notes) = form.notes {
                 input.notes = notes;
             }
@@ -335,7 +427,7 @@ impl AppState {
                 password: form
                     .password
                     .unwrap_or_else(|| copy_secret(current.password())),
-                urls: clean_urls(form.urls),
+                urls: clean_urls(form.urls)?,
                 windows: current.windows().to_vec(),
                 autotype: current.autotype().map(str::to_owned),
                 notes: form.notes.unwrap_or_else(|| copy_secret(current.notes())),
@@ -345,7 +437,15 @@ impl AppState {
         })
     }
 
-    pub fn delete(&self, id: &str) -> Result<(), AppError> {
+    /// Deletes an entry after checking the master password, so that an
+    /// accidental click can never remove anything.
+    pub fn delete(&self, id: &str, password: &SecretString) -> Result<(), AppError> {
+        {
+            let slot = self.slot()?;
+            let vault = slot.as_ref().ok_or(AppError::Locked)?;
+            find(vault.data(), id)?;
+            vault.verify_password(password)?;
+        }
         self.modify(|data| {
             let entry_id = find(data, id)?.id();
             data.remove_entry(entry_id)?;
@@ -489,7 +589,11 @@ mod tests {
             name: name.into(),
             username: " yo@example.com ".into(),
             password: password.map(pw),
-            urls: vec![" https://a.example ".into(), "   ".into()],
+            urls: vec![
+                " https://A.example.com ".into(),
+                "   ".into(),
+                "a.example.com".into(),
+            ],
             notes: notes.map(pw),
         }
     }
@@ -519,7 +623,7 @@ mod tests {
                 id: id.clone(),
                 name: "Correo".into(),
                 username: "yo@example.com".into(),
-                urls: vec!["https://a.example".into()],
+                urls: vec!["https://a.example.com/".into()],
                 has_password: true,
                 has_notes: true,
             }
@@ -543,7 +647,12 @@ mod tests {
         assert_eq!(s.get(&id).unwrap().name, "Correo 2");
         assert_eq!(revealed(&s, &id, SecretField::Password), "secret-2");
 
-        s.delete(&id).unwrap();
+        assert_eq!(
+            s.delete(&id, &pw("wrong")).unwrap_err(),
+            AppError::WrongPasswordOrCorrupted
+        );
+        assert!(s.get(&id).is_ok());
+        s.delete(&id, &pw("master password!")).unwrap();
         assert_eq!(s.get(&id).unwrap_err(), AppError::EntryNotFound);
         s.lock().unwrap();
         s.unlock(&pw("master password!")).unwrap();
@@ -600,7 +709,10 @@ mod tests {
         assert_eq!(s.get(&id).unwrap().name, "keep");
         for missing in ["not-an-id", "00000000-0000-0000-0000-000000000000"] {
             assert_eq!(s.get(missing).unwrap_err(), AppError::EntryNotFound);
-            assert_eq!(s.delete(missing).unwrap_err(), AppError::EntryNotFound);
+            assert_eq!(
+                s.delete(missing, &pw("master password!")).unwrap_err(),
+                AppError::EntryNotFound
+            );
             assert_eq!(
                 s.update(missing, form("x", None, None)).unwrap_err(),
                 AppError::EntryNotFound
@@ -621,7 +733,11 @@ mod tests {
             s.update(&id, form("after", None, None)).unwrap_err(),
             AppError::Io
         );
-        assert_eq!(s.delete(&id).unwrap_err(), AppError::Io);
+        // The password check reads the file, which is gone too.
+        assert_eq!(
+            s.delete(&id, &pw("master password!")).unwrap_err(),
+            AppError::Io
+        );
         let list = s.list("").unwrap();
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].name, "before");
@@ -643,7 +759,10 @@ mod tests {
             s.update(&id, form("n", None, None)).unwrap_err(),
             AppError::Locked
         );
-        assert_eq!(s.delete(&id).unwrap_err(), AppError::Locked);
+        assert_eq!(
+            s.delete(&id, &pw("master password!")).unwrap_err(),
+            AppError::Locked
+        );
     }
 
     #[test]
@@ -682,6 +801,7 @@ mod tests {
     #[test]
     fn generator_command() {
         let options = GeneratorForm {
+            target_bits: None,
             length: 24,
             lowercase: true,
             uppercase: true,
@@ -715,6 +835,101 @@ mod tests {
             generate_password(short).unwrap_err(),
             AppError::InvalidGeneratorOptions
         );
+    }
+
+    #[test]
+    fn generator_by_entropy_target() {
+        let base = GeneratorForm {
+            target_bits: Some(128),
+            length: 0,
+            lowercase: true,
+            uppercase: true,
+            digits: true,
+            symbols: true,
+            exclude_ambiguous: false,
+        };
+        for bits in [64, 128, 256] {
+            let g = generate_password(GeneratorForm {
+                target_bits: Some(bits),
+                ..base
+            })
+            .unwrap();
+            assert!(g.entropy_bits >= f64::from(bits));
+            assert_eq!(g.password.0.expose_secret().len(), g.length);
+        }
+        assert_eq!(generate_password(base).unwrap().length, 20);
+        assert_eq!(
+            generate_password(GeneratorForm {
+                target_bits: Some(100_000),
+                ..base
+            })
+            .unwrap_err(),
+            AppError::InvalidGeneratorOptions
+        );
+    }
+
+    #[test]
+    fn invalid_web_addresses_block_saving() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = unlocked(dir.path());
+        for (url, code) in [
+            ("my bank", AppError::NotAWebAddress),
+            ("javascript:alert(1)", AppError::UnsupportedScheme),
+            (
+                "https://bank.example@evil.example",
+                AppError::EmbeddedCredentials,
+            ),
+        ] {
+            let mut f = form("n", None, None);
+            f.urls = vec!["https://ok.example.com".into(), url.into()];
+            assert_eq!(s.add(f).unwrap_err(), code, "{url}");
+        }
+        assert!(s.list("").unwrap().is_empty());
+    }
+
+    #[test]
+    fn check_url_reports_normalized_form_and_warnings() {
+        let info = check_url("http://Example.com").unwrap();
+        assert_eq!(info.url, "http://example.com/");
+        assert_eq!(info.host, "example.com");
+        assert_eq!(info.warnings, [WebWarning::NotEncrypted]);
+        let json = serde_json::to_string(&info).unwrap();
+        assert!(json.contains(r#""warnings":["notEncrypted"]"#));
+        assert_eq!(
+            check_url("not a site").unwrap_err(),
+            AppError::NotAWebAddress
+        );
+    }
+
+    #[test]
+    fn strength_uses_the_entry_data() {
+        let ctx = StrengthContext {
+            name: "Banco Santander".into(),
+            username: "maria.lopez@example.com".into(),
+            urls: vec!["https://www.bancosantander.es/".into()],
+        };
+        let words = context_words(&ctx);
+        for w in [
+            "banco",
+            "santander",
+            "maria",
+            "lopez",
+            "maria.lopez@example.com",
+        ] {
+            assert!(words.contains(&w.to_owned()), "{w} in {words:?}");
+        }
+        for w in ["www", "https", "es"] {
+            assert!(!words.contains(&w.to_owned()), "{w} in {words:?}");
+        }
+        let weak = estimate_strength(&pw("Santander2024!"), &ctx);
+        assert_eq!(
+            weak.warning,
+            Some(llavero_core::strength::StrengthWarning::ContainsEntryData)
+        );
+        let strong = estimate_strength(&pw("kQ7#mZ2!pL9@xW4$tR8&"), &ctx);
+        assert!(strong.bits > 100.0);
+        let json = serde_json::to_string(&weak).unwrap();
+        assert!(json.contains(r#""warning":"containsEntryData""#));
     }
 
     #[test]

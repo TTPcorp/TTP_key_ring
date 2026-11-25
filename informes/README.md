@@ -49,3 +49,4 @@ Qué se ha hecho y para qué, en dos o tres frases.
 | [0008](0008-2026-11-24-app-tauri-svelte.md) | 2026-11-24 | Primera versión de la app de escritorio (Tauri 2 + Svelte 5) | 1 |
 | [0009](0009-2026-11-24-dependencia-sin-uso-y-version-de-rust.md) | 2026-11-24 | Dependencia sin uso y versión de Rust fijada | 1 |
 | [0010](0010-2026-11-25-formulario-entradas.md) | 2026-11-25 | Formulario de entradas y generador en la app | 1 |
+| [0011](0011-2026-11-25-mejoras-formulario.md) | 2026-11-25 | Modo oscuro, generador por entropía, barra de seguridad (también al escribir), borrado con contraseña y comprobación de webs | 1 |
