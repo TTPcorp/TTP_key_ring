@@ -58,7 +58,7 @@ La especificación del formato del archivo cifrado está en [`docs/vault-format.
 
 ## Requisitos de desarrollo
 
-- **Rust estable** (edición 2024) con `rustfmt` y `clippy`. El archivo `rust-toolchain.toml` los selecciona automáticamente con `rustup`.
+- **Rust** (edición 2024) con `rustup`. La versión exacta del compilador (ahora **1.100.0**) está fijada en `rust-toolchain.toml`, y `rustup` la descarga sola junto con `rustfmt` y `clippy`. Así la CI, el equipo y Claude compilan siempre con la misma versión.
 - **Requisitos de Tauri 2 en Windows:**
   - [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (Build Tools de Visual Studio) con la carga de trabajo «Desarrollo para el escritorio con C++».
   - **WebView2** (incluido en Windows 10 actualizado y Windows 11).
