@@ -47,4 +47,4 @@ Qué se ha hecho y para qué, en dos o tres frases.
 | [0006](0006-2026-11-24-cierre-fase-0.md) | 2026-11-24 | Cierre de la Fase 0: CI verificada, cargo-deny, Dependabot y framework de interfaz | 0 |
 | [0007](0007-2026-11-24-generador-contrasenas.md) | 2026-11-24 | Generador de contraseñas | 1 |
 | [0008](0008-2026-11-24-app-tauri-svelte.md) | 2026-11-24 | Primera versión de la app de escritorio (Tauri 2 + Svelte 5) | 1 |
-| [0009](0009-2026-11-25-formulario-entradas.md) | 2026-11-25 | Formulario de entradas y generador en la app | 1 |
+| [0010](0010-2026-11-25-formulario-entradas.md) | 2026-11-25 | Formulario de entradas y generador en la app | 1 |
