@@ -20,6 +20,7 @@ fn main() {
             "generate_password",
             "check_url",
             "estimate_strength",
+            "copy_to_clipboard",
         ]));
     if let Err(error) = tauri_build::try_build(attributes) {
         eprintln!("tauri build script failed: {error:#}");

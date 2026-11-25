@@ -8,7 +8,7 @@ use secrecy::SecretString;
 use tauri::State;
 
 use crate::state::{
-    self, AppError, AppState, EntryDetails, EntryForm, EntrySummary, GeneratedPassword,
+    self, AppError, AppState, CopyField, EntryDetails, EntryForm, EntrySummary, GeneratedPassword,
     GeneratorForm, Revealed, SecretField, StrengthContext, VaultStatus, WebAddressInfo,
 };
 
@@ -104,4 +104,15 @@ pub async fn estimate_strength(
     context: StrengthContext,
 ) -> Result<StrengthEstimate, AppError> {
     Ok(state::estimate_strength(&password, &context))
+}
+
+/// Copies a user name or password to the clipboard; the value never
+/// reaches the frontend. Returns the seconds until it is cleared.
+#[tauri::command]
+pub async fn copy_to_clipboard(
+    state: State<'_, AppState>,
+    id: String,
+    field: CopyField,
+) -> Result<u64, AppError> {
+    state.copy(&id, field)
 }

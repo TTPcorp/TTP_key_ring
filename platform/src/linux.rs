@@ -1,1 +1,12 @@
-//! Linux implementation of the platform traits (future).
+//! Linux implementation of the platform traits (basic; full port in Phase 4).
+
+use arboard::SetExtLinux;
+
+/// Copies text with the `x-kde-passwordManagerHint` hint, which clipboard
+/// managers that follow it keep out of their history.
+pub(crate) fn set_secret_text(
+    clipboard: &mut arboard::Clipboard,
+    text: &str,
+) -> Result<(), arboard::Error> {
+    clipboard.set().exclude_from_history().text(text)
+}

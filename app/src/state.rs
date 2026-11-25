@@ -2,7 +2,8 @@
 //! Tauri so it can be unit-tested.
 
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use llavero_core::crypto::KdfParams;
 use llavero_core::generator::{self, GeneratorError, PasswordOptions};
@@ -10,8 +11,10 @@ use llavero_core::model::{Entry, EntryInput, ModelError, VaultData};
 use llavero_core::strength::{self, StrengthEstimate};
 use llavero_core::vault::{Vault, VaultError};
 use llavero_core::web::{self, WebAddressError, WebWarning};
+use llavero_platform::{Clipboard, SystemClipboard, clear_if_unchanged};
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize, Serializer};
+use zeroize::Zeroizing;
 
 /// Error sent to the frontend: only a stable code, never secrets or paths.
 /// The UI translates codes into user-facing messages.
@@ -32,6 +35,8 @@ pub enum AppError {
     NotAWebAddress,
     UnsupportedScheme,
     EmbeddedCredentials,
+    ClipboardUnavailable,
+    NothingToCopy,
     Io,
     Internal,
 }
@@ -130,6 +135,26 @@ pub struct EntryForm {
     pub password: Option<SecretString>,
     pub urls: Vec<String>,
     pub notes: Option<SecretString>,
+}
+
+/// Field the user asked to copy to the clipboard.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CopyField {
+    Username,
+    Password,
+}
+
+/// Seconds a copied user name or password stays on the clipboard
+/// (within the 15–30 s range of the requirements).
+pub const CLIPBOARD_CLEAR_SECONDS: u64 = 20;
+
+/// The last value copied, until it is cleared. `generation` grows with
+/// every copy, so a timer only clears the copy that started it.
+#[derive(Default)]
+struct PendingCopy {
+    generation: u64,
+    value: Option<Zeroizing<String>>,
 }
 
 /// Secret field the user explicitly asked to reveal.
@@ -311,20 +336,36 @@ pub struct AppState {
     path: PathBuf,
     kdf: KdfParams,
     vault: Mutex<Option<Vault>>,
+    clipboard: Arc<dyn Clipboard>,
+    clipboard_delay: Duration,
+    pending_copy: Arc<Mutex<PendingCopy>>,
 }
 
 impl AppState {
     /// State for the vault at `path`, using the default KDF parameters
-    /// for new vaults.
+    /// for new vaults and the system clipboard.
     pub fn new(path: PathBuf) -> Self {
-        Self::with_kdf(path, KdfParams::DEFAULT)
+        Self::with_parts(
+            path,
+            KdfParams::DEFAULT,
+            Arc::new(SystemClipboard::new()),
+            Duration::from_secs(CLIPBOARD_CLEAR_SECONDS),
+        )
     }
 
-    fn with_kdf(path: PathBuf, kdf: KdfParams) -> Self {
+    fn with_parts(
+        path: PathBuf,
+        kdf: KdfParams,
+        clipboard: Arc<dyn Clipboard>,
+        clipboard_delay: Duration,
+    ) -> Self {
         Self {
             path,
             kdf,
             vault: Mutex::new(None),
+            clipboard,
+            clipboard_delay,
+            pending_copy: Arc::new(Mutex::new(PendingCopy::default())),
         }
     }
 
@@ -355,9 +396,64 @@ impl AppState {
         Ok(())
     }
 
+    /// Locks the vault and removes anything it put on the clipboard.
     pub fn lock(&self) -> Result<(), AppError> {
         *self.slot()? = None;
+        self.clear_clipboard_now();
         Ok(())
+    }
+
+    /// Copies the user name or password of an entry to the clipboard
+    /// without sending it to the frontend, and schedules its removal.
+    /// Returns the seconds until it is cleared.
+    pub fn copy(&self, id: &str, field: CopyField) -> Result<u64, AppError> {
+        let value = {
+            let slot = self.slot()?;
+            let vault = slot.as_ref().ok_or(AppError::Locked)?;
+            let e = find(vault.data(), id)?;
+            Zeroizing::new(match field {
+                CopyField::Username => e.username().to_owned(),
+                CopyField::Password => e.password().expose_secret().to_owned(),
+            })
+        };
+        if value.is_empty() {
+            return Err(AppError::NothingToCopy);
+        }
+        self.clipboard
+            .set_secret(&value)
+            .map_err(|_| AppError::ClipboardUnavailable)?;
+
+        let generation = {
+            let mut pending = self.pending_copy.lock().map_err(|_| AppError::Internal)?;
+            pending.generation += 1;
+            pending.value = Some(value);
+            pending.generation
+        };
+        let pending = Arc::clone(&self.pending_copy);
+        let clipboard = Arc::clone(&self.clipboard);
+        let delay = self.clipboard_delay;
+        std::thread::spawn(move || {
+            std::thread::sleep(delay);
+            if let Ok(mut pending) = pending.lock()
+                && pending.generation == generation
+                && let Some(value) = pending.value.take()
+            {
+                // Best effort: if the clipboard is busy there is nothing
+                // more to do, and the value is wiped from memory anyway.
+                let _ = clear_if_unchanged(clipboard.as_ref(), &value);
+            }
+        });
+        Ok(delay.as_secs())
+    }
+
+    /// Clears the last copied value from the clipboard right away (if the
+    /// user has not copied anything else since). Used on lock and exit.
+    pub fn clear_clipboard_now(&self) {
+        if let Ok(mut pending) = self.pending_copy.lock()
+            && let Some(value) = pending.value.take()
+        {
+            let _ = clear_if_unchanged(self.clipboard.as_ref(), &value);
+        }
     }
 
     pub fn list(&self, query: &str) -> Result<Vec<EntrySummary>, AppError> {
@@ -492,7 +588,120 @@ mod tests {
 
     fn state(dir: &Path) -> AppState {
         let fast = KdfParams::new(KdfParams::MIN_M_COST_KIB, KdfParams::MIN_T_COST, 1).unwrap();
-        AppState::with_kdf(dir.join("sub").join("llavero.vault"), fast)
+        AppState::with_parts(
+            dir.join("sub").join("llavero.vault"),
+            fast,
+            Arc::new(FakeClipboard::default()),
+            Duration::from_secs(3600),
+        )
+    }
+
+    /// In-memory clipboard.
+    #[derive(Default)]
+    struct FakeClipboard {
+        content: Mutex<Option<String>>,
+    }
+
+    impl Clipboard for FakeClipboard {
+        fn set_secret(&self, text: &str) -> Result<(), llavero_platform::ClipboardError> {
+            *self.content.lock().unwrap() = Some(text.to_owned());
+            Ok(())
+        }
+        fn get_text(&self) -> Result<Option<Zeroizing<String>>, llavero_platform::ClipboardError> {
+            Ok(self.content.lock().unwrap().clone().map(Zeroizing::new))
+        }
+        fn clear(&self) -> Result<(), llavero_platform::ClipboardError> {
+            *self.content.lock().unwrap() = None;
+            Ok(())
+        }
+    }
+
+    fn with_clipboard(dir: &Path, delay: Duration) -> (AppState, Arc<FakeClipboard>) {
+        let fast = KdfParams::new(KdfParams::MIN_M_COST_KIB, KdfParams::MIN_T_COST, 1).unwrap();
+        let clipboard = Arc::new(FakeClipboard::default());
+        let s = AppState::with_parts(
+            dir.join("llavero.vault"),
+            fast,
+            Arc::clone(&clipboard) as Arc<dyn Clipboard>,
+            delay,
+        );
+        s.create(&pw("master password!")).unwrap();
+        (s, clipboard)
+    }
+
+    fn clip(c: &FakeClipboard) -> Option<String> {
+        c.content.lock().unwrap().clone()
+    }
+
+    #[test]
+    fn copy_puts_the_value_and_clears_it_later() {
+        let dir = tempfile::tempdir().unwrap();
+        let (s, c) = with_clipboard(dir.path(), Duration::from_millis(100));
+        let id = s.add(form("n", Some("secret-pw"), None)).unwrap();
+
+        assert_eq!(s.copy(&id, CopyField::Password).unwrap(), 0);
+        assert_eq!(clip(&c).as_deref(), Some("secret-pw"));
+        std::thread::sleep(Duration::from_millis(400));
+        assert_eq!(clip(&c), None);
+
+        s.copy(&id, CopyField::Username).unwrap();
+        assert_eq!(clip(&c).as_deref(), Some("yo@example.com"));
+    }
+
+    #[test]
+    fn a_newer_copy_is_not_cleared_by_an_older_timer() {
+        let dir = tempfile::tempdir().unwrap();
+        let (s, c) = with_clipboard(dir.path(), Duration::from_millis(300));
+        let id = s.add(form("n", Some("secret-pw"), None)).unwrap();
+        s.copy(&id, CopyField::Password).unwrap();
+        std::thread::sleep(Duration::from_millis(200));
+        s.copy(&id, CopyField::Username).unwrap();
+        // The first timer fires here: the newer copy must survive it.
+        std::thread::sleep(Duration::from_millis(200));
+        assert_eq!(clip(&c).as_deref(), Some("yo@example.com"));
+        std::thread::sleep(Duration::from_millis(300));
+        assert_eq!(clip(&c), None);
+    }
+
+    #[test]
+    fn what_the_user_copies_afterwards_is_never_cleared() {
+        let dir = tempfile::tempdir().unwrap();
+        let (s, c) = with_clipboard(dir.path(), Duration::from_millis(100));
+        let id = s.add(form("n", Some("secret-pw"), None)).unwrap();
+        s.copy(&id, CopyField::Password).unwrap();
+        c.set_secret("something the user copied").unwrap();
+        std::thread::sleep(Duration::from_millis(400));
+        assert_eq!(clip(&c).as_deref(), Some("something the user copied"));
+    }
+
+    #[test]
+    fn locking_clears_the_clipboard_at_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let (s, c) = with_clipboard(dir.path(), Duration::from_secs(3600));
+        let id = s.add(form("n", Some("secret-pw"), None)).unwrap();
+        s.copy(&id, CopyField::Password).unwrap();
+        s.lock().unwrap();
+        assert_eq!(clip(&c), None);
+    }
+
+    #[test]
+    fn copy_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let (s, _c) = with_clipboard(dir.path(), Duration::from_secs(3600));
+        let id = s.add(form("n", None, None)).unwrap();
+        assert_eq!(
+            s.copy(&id, CopyField::Password).unwrap_err(),
+            AppError::NothingToCopy
+        );
+        assert_eq!(
+            s.copy("missing", CopyField::Username).unwrap_err(),
+            AppError::EntryNotFound
+        );
+        s.lock().unwrap();
+        assert_eq!(
+            s.copy(&id, CopyField::Username).unwrap_err(),
+            AppError::Locked
+        );
     }
 
     #[test]

@@ -16,6 +16,7 @@
     "allow-delete-entry",
     "allow-generate-password",
     "allow-check-url",
-    "allow-estimate-strength"
+    "allow-estimate-strength",
+    "allow-copy-to-clipboard"
   ]
 }

@@ -7,6 +7,7 @@ mod commands;
 mod state;
 
 use state::AppState;
+use tauri::Manager;
 
 fn main() {
     let Some(vault_path) = state::default_vault_path() else {
@@ -30,11 +31,21 @@ fn main() {
             commands::generate_password,
             commands::check_url,
             commands::estimate_strength,
+            commands::copy_to_clipboard,
         ])
-        .run(tauri::generate_context!());
+        .build(tauri::generate_context!());
 
-    if let Err(error) = result {
-        eprintln!("LLavero Digital failed to start: {error}");
-        std::process::exit(1);
-    }
+    let app = match result {
+        Ok(app) => app,
+        Err(error) => {
+            eprintln!("LLavero Digital failed to start: {error}");
+            std::process::exit(1);
+        }
+    };
+    app.run(|handle, event| {
+        // Never leave a copied password behind when the app closes.
+        if let tauri::RunEvent::Exit = event {
+            handle.state::<AppState>().clear_clipboard_now();
+        }
+    });
 }
