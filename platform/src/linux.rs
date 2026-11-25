@@ -10,3 +10,9 @@ pub(crate) fn set_secret_text(
 ) -> Result<(), arboard::Error> {
     clipboard.set().exclude_from_history().text(text)
 }
+
+/// Not implemented yet on Linux (Phase 4): the inactivity timeout still
+/// locks the vault.
+pub(crate) fn is_session_locked() -> Option<bool> {
+    None
+}

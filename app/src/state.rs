@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use llavero_core::crypto::KdfParams;
 use llavero_core::generator::{self, GeneratorError, PasswordOptions};
@@ -93,12 +93,28 @@ impl From<VaultError> for AppError {
     }
 }
 
-/// Whether a vault file exists and whether it is unlocked.
+/// Why the vault was locked automatically.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LockReason {
+    /// No activity for [`IDLE_TIMEOUT`].
+    Inactivity,
+    /// The Windows session was locked (Win+L).
+    SessionLocked,
+}
+
+/// Whether a vault file exists, whether it is unlocked and, if it was
+/// locked automatically, why (so the UI can say so).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct VaultStatus {
     pub exists: bool,
     pub unlocked: bool,
+    pub lock_reason: Option<LockReason>,
 }
+
+/// Time without activity after which the vault locks itself.
+pub const IDLE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
 /// Non-secret view of an entry for the list. Passwords and notes are
 /// never sent to the frontend by this command.
@@ -339,6 +355,8 @@ pub struct AppState {
     clipboard: Arc<dyn Clipboard>,
     clipboard_delay: Duration,
     pending_copy: Arc<Mutex<PendingCopy>>,
+    last_activity: Mutex<Instant>,
+    lock_reason: Mutex<Option<LockReason>>,
 }
 
 impl AppState {
@@ -366,6 +384,8 @@ impl AppState {
             clipboard,
             clipboard_delay,
             pending_copy: Arc::new(Mutex::new(PendingCopy::default())),
+            last_activity: Mutex::new(Instant::now()),
+            lock_reason: Mutex::new(None),
         }
     }
 
@@ -377,7 +397,51 @@ impl AppState {
         Ok(VaultStatus {
             exists: self.path.try_exists().map_err(|_| AppError::Io)?,
             unlocked: self.slot()?.is_some(),
+            lock_reason: *self.lock_reason.lock().map_err(|_| AppError::Internal)?,
         })
+    }
+
+    /// Records user activity (keys, clicks, mouse in the window), which
+    /// postpones the inactivity lock.
+    pub fn touch(&self) {
+        if let Ok(mut last) = self.last_activity.lock() {
+            *last = Instant::now();
+        }
+    }
+
+    /// Called periodically: locks the vault if the session is locked or
+    /// there has been no activity for [`IDLE_TIMEOUT`]. Returns the reason
+    /// if it locked it now.
+    pub fn auto_lock(&self, now: Instant, session_locked: bool) -> Option<LockReason> {
+        let unlocked = self.slot().map(|s| s.is_some()).unwrap_or(false);
+        if !unlocked {
+            return None;
+        }
+        let idle = self
+            .last_activity
+            .lock()
+            .map(|last| now.saturating_duration_since(*last))
+            .unwrap_or(Duration::MAX);
+        let reason = if session_locked {
+            LockReason::SessionLocked
+        } else if idle >= IDLE_TIMEOUT {
+            LockReason::Inactivity
+        } else {
+            return None;
+        };
+        self.lock().ok()?;
+        if let Ok(mut r) = self.lock_reason.lock() {
+            *r = Some(reason);
+        }
+        Some(reason)
+    }
+
+    /// Fresh start after creating or opening the vault.
+    fn opened(&self) {
+        self.touch();
+        if let Ok(mut r) = self.lock_reason.lock() {
+            *r = None;
+        }
     }
 
     /// Creates a new vault at the default location and leaves it unlocked.
@@ -387,12 +451,16 @@ impl AppState {
             std::fs::create_dir_all(parent).map_err(|_| AppError::Io)?;
         }
         *slot = Some(Vault::create(&self.path, password, self.kdf)?);
+        drop(slot);
+        self.opened();
         Ok(())
     }
 
     pub fn unlock(&self, password: &SecretString) -> Result<(), AppError> {
         let mut slot = self.slot()?;
         *slot = Some(Vault::open(&self.path, password)?);
+        drop(slot);
+        self.opened();
         Ok(())
     }
 
@@ -400,6 +468,9 @@ impl AppState {
     pub fn lock(&self) -> Result<(), AppError> {
         *self.slot()? = None;
         self.clear_clipboard_now();
+        if let Ok(mut r) = self.lock_reason.lock() {
+            *r = None;
+        }
         Ok(())
     }
 
@@ -407,6 +478,7 @@ impl AppState {
     /// without sending it to the frontend, and schedules its removal.
     /// Returns the seconds until it is cleared.
     pub fn copy(&self, id: &str, field: CopyField) -> Result<u64, AppError> {
+        self.touch();
         let value = {
             let slot = self.slot()?;
             let vault = slot.as_ref().ok_or(AppError::Locked)?;
@@ -457,6 +529,7 @@ impl AppState {
     }
 
     pub fn list(&self, query: &str) -> Result<Vec<EntrySummary>, AppError> {
+        self.touch();
         let slot = self.slot()?;
         let vault = slot.as_ref().ok_or(AppError::Locked)?;
         Ok(vault
@@ -472,6 +545,7 @@ impl AppState {
     }
 
     pub fn get(&self, id: &str) -> Result<EntryDetails, AppError> {
+        self.touch();
         let slot = self.slot()?;
         let vault = slot.as_ref().ok_or(AppError::Locked)?;
         let e = find(vault.data(), id)?;
@@ -487,6 +561,7 @@ impl AppState {
 
     /// Returns one secret field. Only called on an explicit user action.
     pub fn reveal(&self, id: &str, field: SecretField) -> Result<Revealed, AppError> {
+        self.touch();
         let slot = self.slot()?;
         let vault = slot.as_ref().ok_or(AppError::Locked)?;
         let e = find(vault.data(), id)?;
@@ -497,6 +572,7 @@ impl AppState {
     }
 
     pub fn add(&self, form: EntryForm) -> Result<String, AppError> {
+        self.touch();
         self.modify(|data| {
             let mut input = EntryInput::new(
                 form.name.trim(),
@@ -515,6 +591,7 @@ impl AppState {
     /// fields the form does not show yet (auto-type windows and sequence)
     /// are kept as they are.
     pub fn update(&self, id: &str, form: EntryForm) -> Result<(), AppError> {
+        self.touch();
         self.modify(|data| {
             let current = find(data, id)?;
             let input = EntryInput {
@@ -536,6 +613,7 @@ impl AppState {
     /// Deletes an entry after checking the master password, so that an
     /// accidental click can never remove anything.
     pub fn delete(&self, id: &str, password: &SecretString) -> Result<(), AppError> {
+        self.touch();
         {
             let slot = self.slot()?;
             let vault = slot.as_ref().ok_or(AppError::Locked)?;
@@ -705,6 +783,79 @@ mod tests {
     }
 
     #[test]
+    fn locks_after_the_idle_timeout() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = unlocked(dir.path());
+        let start = Instant::now();
+        assert_eq!(s.auto_lock(start + IDLE_TIMEOUT / 2, false), None);
+        assert!(s.status().unwrap().unlocked);
+        assert_eq!(
+            s.auto_lock(start + IDLE_TIMEOUT + Duration::from_secs(1), false),
+            Some(LockReason::Inactivity)
+        );
+        let status = s.status().unwrap();
+        assert!(!status.unlocked);
+        assert_eq!(status.lock_reason, Some(LockReason::Inactivity));
+        // Already locked: nothing more to do.
+        assert_eq!(s.auto_lock(start + IDLE_TIMEOUT * 3, true), None);
+        // Opening again clears the reason.
+        s.unlock(&pw("master password!")).unwrap();
+        assert_eq!(s.status().unwrap().lock_reason, None);
+    }
+
+    #[test]
+    fn activity_postpones_the_lock() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = unlocked(dir.path());
+        std::thread::sleep(Duration::from_millis(20));
+        let before_touch = Instant::now();
+        s.touch();
+        // Measured from the last activity, not from the unlock.
+        assert_eq!(
+            s.auto_lock(
+                before_touch + IDLE_TIMEOUT - Duration::from_millis(1),
+                false
+            ),
+            None
+        );
+        // Using the vault also counts as activity.
+        let before_list = Instant::now();
+        s.list("").unwrap();
+        assert_eq!(
+            s.auto_lock(before_list + IDLE_TIMEOUT - Duration::from_millis(1), false),
+            None
+        );
+        assert!(s.status().unwrap().unlocked);
+    }
+
+    #[test]
+    fn locks_at_once_when_the_session_is_locked() {
+        let dir = tempfile::tempdir().unwrap();
+        let (s, c) = with_clipboard(dir.path(), Duration::from_secs(3600));
+        let id = s.add(form("n", Some("secret-pw"), None)).unwrap();
+        s.copy(&id, CopyField::Password).unwrap();
+        assert_eq!(
+            s.auto_lock(Instant::now(), true),
+            Some(LockReason::SessionLocked)
+        );
+        assert!(!s.status().unwrap().unlocked);
+        // Locking also cleared the copied password.
+        assert_eq!(clip(&c), None);
+    }
+
+    #[test]
+    fn manual_lock_has_no_reason() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = unlocked(dir.path());
+        s.auto_lock(Instant::now(), true);
+        s.unlock(&pw("master password!")).unwrap();
+        s.lock().unwrap();
+        assert_eq!(s.status().unwrap().lock_reason, None);
+        let json = serde_json::to_string(&LockReason::SessionLocked).unwrap();
+        assert_eq!(json, r#""sessionLocked""#);
+    }
+
+    #[test]
     fn full_lifecycle() {
         let dir = tempfile::tempdir().unwrap();
         let s = state(dir.path());
@@ -712,7 +863,8 @@ mod tests {
             s.status().unwrap(),
             VaultStatus {
                 exists: false,
-                unlocked: false
+                unlocked: false,
+                lock_reason: None
             }
         );
         assert_eq!(s.list("").unwrap_err(), AppError::Locked);
@@ -722,7 +874,8 @@ mod tests {
             s.status().unwrap(),
             VaultStatus {
                 exists: true,
-                unlocked: true
+                unlocked: true,
+                lock_reason: None
             }
         );
 
@@ -739,7 +892,8 @@ mod tests {
             s.status().unwrap(),
             VaultStatus {
                 exists: true,
-                unlocked: false
+                unlocked: false,
+                lock_reason: None
             }
         );
         assert_eq!(

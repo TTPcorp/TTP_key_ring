@@ -7,6 +7,7 @@ mod commands;
 mod state;
 
 use state::AppState;
+use std::time::{Duration, Instant};
 use tauri::Manager;
 
 fn main() {
@@ -32,7 +33,23 @@ fn main() {
             commands::check_url,
             commands::estimate_strength,
             commands::copy_to_clipboard,
+            commands::user_activity,
         ])
+        .setup(|app| {
+            // Auto-lock watcher: every 2 s, lock the vault if the Windows
+            // session is locked or the idle timeout has passed.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                loop {
+                    std::thread::sleep(Duration::from_secs(2));
+                    let session_locked = llavero_platform::is_session_locked().unwrap_or(false);
+                    handle
+                        .state::<AppState>()
+                        .auto_lock(Instant::now(), session_locked);
+                }
+            });
+            Ok(())
+        })
         .build(tauri::generate_context!());
 
     let app = match result {

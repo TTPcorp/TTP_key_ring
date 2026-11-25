@@ -116,3 +116,10 @@ pub async fn copy_to_clipboard(
 ) -> Result<u64, AppError> {
     state.copy(&id, field)
 }
+
+/// Called by the frontend (throttled) on keys, clicks and mouse movement:
+/// postpones the inactivity lock.
+#[tauri::command]
+pub fn user_activity(state: State<'_, AppState>) {
+    state.touch();
+}

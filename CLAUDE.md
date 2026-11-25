@@ -24,6 +24,7 @@ If you think any of the above should change, propose it and wait for confirmatio
 ## Working rules
 
 - No new cryptography dependency without justification. **Never** hand-roll cryptographic primitives.
+- No `unsafe` code (`unsafe_code = "deny"` in the workspace). The only approved exception is `is_session_locked` in `platform/src/windows.rs` (Windows session-lock query, approved by the project owner on 2026-11-25, report 0013), with a local `#[allow(unsafe_code)]` and `SAFETY` comments. Any new exception needs the owner's explicit approval.
 - No `unwrap()` / `expect()` in `core` production code; use typed errors (`thiserror`). (Enforced workspace-wide by clippy lints; allowed in tests via `clippy.toml`.)
 - No secrets in logs, error messages, tests with real data, or commits.
 - Every change in `core` comes with tests.

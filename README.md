@@ -2,7 +2,7 @@
 
 Gestor de contraseñas de escritorio para uso interno. Guarda las credenciales de páginas web y programas de forma **local y cifrada**, y las **rellena automáticamente** en ambos. Permite usar contraseñas largas y únicas sin depender de ningún servicio en la nube: la aplicación no se conecta a internet.
 
-> **Estado:** Fase 0 terminada. Fase 1 (MVP) en marcha. El `core` ya sabe crear, abrir, editar y guardar un llavero cifrado, y la app de escritorio ya permite crear o abrir el llavero, ver, buscar, añadir, editar y borrar entradas (con generador por entropía, barra de seguridad también mientras se escribe y comprobación de direcciones web), cambiar entre tema claro y oscuro, copiar el usuario o la contraseña al portapapeles (con borrado automático) y bloquearlo. Falta el bloqueo automático para cerrar la Fase 1. Detalle en [Avances](#avances) y en [`informes/`](informes/).
+> **Estado:** Fases 0 y 1 (MVP) terminadas. La app de escritorio permite crear o abrir el llavero cifrado; ver, buscar, añadir, editar y borrar entradas (con generador por entropía, barra de seguridad también mientras se escribe y comprobación de direcciones web); copiar el usuario o la contraseña al portapapeles con borrado automático; cambiar entre tema claro y oscuro; y bloquearlo a mano, tras 5 minutos sin actividad o al bloquear la sesión de Windows. Siguiente: Fase 2 (auto-type en programas). Detalle en [Avances](#avances) y en [`informes/`](informes/).
 
 ## Características
 
@@ -10,17 +10,17 @@ Leyenda: ✅ disponible · 🚧 en desarrollo · 📋 prevista
 
 | Característica | Estado |
 |---|---|
-| Llavero local cifrado (`llavero.vault`) protegido con contraseña maestra | 🚧 Fase 1 — crear y abrir, hecho en la app; falta cambiar la contraseña maestra desde la app |
-| Alta, edición y borrado de entradas (nombre, usuario, contraseña, URL/programa, notas) | 🚧 Fase 1 — hecho en el `core` y en la app; faltan los campos de programa (Fase 2) |
+| Llavero local cifrado (`llavero.vault`) protegido con contraseña maestra | ✅ Fase 1 (cambiar la contraseña maestra desde la app: menú de ajustes, Fase 4) |
+| Alta, edición y borrado de entradas (nombre, usuario, contraseña, URL/programa, notas) | ✅ Fase 1 (campos de programa para el auto-type: Fase 2) |
 | Generador de contraseñas seguras (por longitud o por entropía: 64, 128 o 256 bits) con barra de seguridad | ✅ Fase 1 |
 | Barra de seguridad mientras se escribe una contraseña, con avisos (contraseña común, datos de la entrada…) | ✅ Fase 1 |
 | Copia al portapapeles con limpieza automática (20 s), fuera del historial de Windows | ✅ Fase 1 |
-| Bloqueo automático por inactividad o al bloquear la sesión de Windows | 📋 Fase 1 |
+| Bloqueo automático por inactividad (5 min) o al bloquear la sesión de Windows | ✅ Fase 1 |
 | Lista, búsqueda y formulario de entradas | ✅ Fase 1 |
 | Tema claro y oscuro | ✅ Fase 1 |
 | Comprobación sin conexión de direcciones web (formato, http, IP, caracteres engañosos) | ✅ Fase 1 |
 | Borrado de entradas protegido con la contraseña maestra | ✅ Fase 1 |
-| Guardado atómico y copia de seguridad del archivo cifrado | 🚧 Fase 1 — hecho en el `core`; falta la interfaz |
+| Guardado atómico y copia de seguridad automática (`.bak`) del archivo cifrado | ✅ Fase 1 (exportar una copia desde la app: menú de ajustes, Fase 4) |
 | Auto-type en programas con atajo de teclado global | 📋 Fase 2 |
 | Extensión de navegador con autorrelleno y coincidencia exacta de dominio | 📋 Fase 3 |
 | Importación desde navegadores (CSV), carpetas y etiquetas | 📋 Fase 4 |
@@ -51,7 +51,7 @@ Extensión navegador  ◄── Native Messaging (local) ──►  App de escri
 | Carpeta | Crate | Responsabilidad |
 |---|---|---|
 | `core/` | `llavero-core` | Lógica pura y portable: formato del llavero, cifrado, modelo de entradas, generador de contraseñas, estimación de la fuerza de contraseñas, comprobación de direcciones web, búsqueda y coincidencia. Sin dependencias del SO ni de Tauri. Con tests unitarios. |
-| `platform/` | `llavero-platform` | Traits comunes e implementaciones por sistema (`windows` ahora; `linux` y `macos` en el futuro). Ya incluye el portapapeles. |
+| `platform/` | `llavero-platform` | Traits comunes e implementaciones por sistema (`windows` ahora; `linux` y `macos` en el futuro). Ya incluye el portapapeles y la detección de sesión bloqueada. |
 | `app/` | `llavero-app` | Aplicación Tauri: interfaz y comandos. |
 | `native-host/` | `llavero-native-host` | Puente Native Messaging entre la extensión y la app. |
 | `extension/` | — | Extensión de navegador (WebExtensions MV3; no es un crate de Rust). |
@@ -148,10 +148,12 @@ Leyenda: ✅ hecho · 🚧 en curso · ⬜ pendiente. Cada avance tiene su infor
 - ✅ Crear/abrir llavero, cabecera del archivo, guardado atómico, `.bak`, exportación y cambio de contraseña maestra (`core::vault`) ([0005](informes/0005-2026-11-24-modelo-y-archivo-vault.md))
 - ✅ Generador de contraseñas (`core::generator`) ([0007](informes/0007-2026-11-24-generador-contrasenas.md)), integrado en el formulario de la app ([0010](informes/0010-2026-11-25-formulario-entradas.md))
 - ✅ Copia al portapapeles con borrado automático a los 20 s, al bloquear y al cerrar, fuera del historial de Windows ([0012](informes/0012-2026-11-25-portapapeles.md))
-- ⬜ Bloqueo automático
+- ✅ Bloqueo automático tras 5 minutos sin actividad y al bloquear la sesión de Windows ([0013](informes/0013-2026-11-25-bloqueo-automatico.md))
 - ✅ Interfaz: app Tauri 2 + Svelte con crear/abrir llavero, lista, búsqueda y bloqueo manual ([0008](informes/0008-2026-11-24-app-tauri-svelte.md))
 - ✅ Formulario de entradas en la app: añadir, editar y borrar, con generador y secretos solo bajo petición ([0010](informes/0010-2026-11-25-formulario-entradas.md))
 - ✅ Modo oscuro, generador por entropía (128 bits por defecto), barra de seguridad (también al escribir, con zxcvbn), borrado con contraseña maestra y comprobación de webs sin conexión ([0011](informes/0011-2026-11-25-mejoras-formulario.md))
+
+**Fase 1 terminada** (2026-11-25). Cambiar la contraseña maestra y exportar una copia de seguridad ya funcionan en el `core`, pero su botón en la app irá en el menú de ajustes (Fase 4).
 
 **Fases 2–4:** sin empezar.
 
@@ -181,7 +183,8 @@ Importancia: **Crítica** (bloquea lo demás o compromete la seguridad) · **Alt
 **Fase 4 — Extras**
 - Media: importar desde navegadores (CSV); carpetas y etiquetas.
 - Media: diccionarios en español para el estimador de fuerza (palabras, nombres y contraseñas comunes).
-- Baja: auditoría de contraseñas débiles o repetidas (con el estimador de fuerza); selector de tema más discreto (en un menú de ajustes o con iconos); port a Linux y macOS.
+- Media: menú de ajustes: cambiar la contraseña maestra, exportar una copia de seguridad, tiempo de bloqueo por inactividad y de borrado del portapapeles, y tema (con iconos, más discreto).
+- Baja: auditoría de contraseñas débiles o repetidas (con el estimador de fuerza); port a Linux y macOS (incluida la detección de sesión bloqueada).
 
 **Transversal:** tests del `core` y revisión de seguridad en cada fase.
 
