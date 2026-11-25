@@ -12,6 +12,12 @@ fn main() {
             "unlock_vault",
             "lock_vault",
             "list_entries",
+            "get_entry",
+            "reveal_secret",
+            "add_entry",
+            "update_entry",
+            "delete_entry",
+            "generate_password",
         ]));
     if let Err(error) = tauri_build::try_build(attributes) {
         eprintln!("tauri build script failed: {error:#}");

@@ -2,7 +2,7 @@
 
 Gestor de contraseñas de escritorio para uso interno. Guarda las credenciales de páginas web y programas de forma **local y cifrada**, y las **rellena automáticamente** en ambos. Permite usar contraseñas largas y únicas sin depender de ningún servicio en la nube: la aplicación no se conecta a internet.
 
-> **Estado:** Fase 0 terminada. Fase 1 (MVP) en marcha. El `core` ya sabe crear, abrir, editar y guardar un llavero cifrado, y la app de escritorio ya permite crear o abrir el llavero, ver y buscar entradas y bloquearlo. Falta poder añadir y editar entradas desde la app. Detalle en [Avances](#avances) y en [`informes/`](informes/).
+> **Estado:** Fase 0 terminada. Fase 1 (MVP) en marcha. El `core` ya sabe crear, abrir, editar y guardar un llavero cifrado, y la app de escritorio ya permite crear o abrir el llavero, ver, buscar, añadir, editar y borrar entradas (con generador de contraseñas) y bloquearlo. Faltan la copia al portapapeles y el bloqueo automático. Detalle en [Avances](#avances) y en [`informes/`](informes/).
 
 ## Características
 
@@ -10,12 +10,12 @@ Leyenda: ✅ disponible · 🚧 en desarrollo · 📋 prevista
 
 | Característica | Estado |
 |---|---|
-| Llavero local cifrado (`llavero.vault`) protegido con contraseña maestra | 🚧 Fase 1 — hecho en el `core`; falta la interfaz |
-| Alta, edición y borrado de entradas (nombre, usuario, contraseña, URL/programa, notas) | 🚧 Fase 1 — hecho en el `core`; falta la interfaz |
-| Generador de contraseñas seguras | 🚧 Fase 1 — hecho en el `core`; falta la interfaz |
+| Llavero local cifrado (`llavero.vault`) protegido con contraseña maestra | 🚧 Fase 1 — crear y abrir, hecho en la app; falta cambiar la contraseña maestra desde la app |
+| Alta, edición y borrado de entradas (nombre, usuario, contraseña, URL/programa, notas) | 🚧 Fase 1 — hecho en el `core` y en la app; faltan los campos de programa (Fase 2) |
+| Generador de contraseñas seguras | ✅ Fase 1 |
 | Copia al portapapeles con limpieza automática (15–30 s) | 📋 Fase 1 |
 | Bloqueo automático por inactividad o al bloquear la sesión de Windows | 📋 Fase 1 |
-| Lista, búsqueda y formulario de entradas | 🚧 Fase 1 — lista y búsqueda hechas; falta el formulario |
+| Lista, búsqueda y formulario de entradas | ✅ Fase 1 |
 | Guardado atómico y copia de seguridad del archivo cifrado | 🚧 Fase 1 — hecho en el `core`; falta la interfaz |
 | Auto-type en programas con atajo de teclado global | 📋 Fase 2 |
 | Extensión de navegador con autorrelleno y coincidencia exacta de dominio | 📋 Fase 3 |
@@ -142,9 +142,10 @@ Leyenda: ✅ hecho · 🚧 en curso · ⬜ pendiente. Cada avance tiene su infor
 - ✅ Cifrado: Argon2id + XChaCha20-Poly1305 en `core::crypto` ([0003](informes/0003-2026-11-24-capa-criptografica.md))
 - ✅ Modelo de entradas y búsqueda (`core::model`) ([0005](informes/0005-2026-11-24-modelo-y-archivo-vault.md))
 - ✅ Crear/abrir llavero, cabecera del archivo, guardado atómico, `.bak`, exportación y cambio de contraseña maestra (`core::vault`) ([0005](informes/0005-2026-11-24-modelo-y-archivo-vault.md))
-- ✅ Generador de contraseñas (`core::generator`) ([0007](informes/0007-2026-11-24-generador-contrasenas.md))
+- ✅ Generador de contraseñas (`core::generator`) ([0007](informes/0007-2026-11-24-generador-contrasenas.md)), integrado en el formulario de la app ([0009](informes/0009-2026-11-25-formulario-entradas.md))
 - ⬜ Bloqueo automático y limpieza del portapapeles
-- 🚧 Interfaz: app Tauri 2 + Svelte con crear/abrir llavero, lista, búsqueda y bloqueo manual ([0008](informes/0008-2026-11-24-app-tauri-svelte.md)); falta el formulario de entradas
+- ✅ Interfaz: app Tauri 2 + Svelte con crear/abrir llavero, lista, búsqueda y bloqueo manual ([0008](informes/0008-2026-11-24-app-tauri-svelte.md))
+- ✅ Formulario de entradas en la app: añadir, editar y borrar, con generador y secretos solo bajo petición ([0009](informes/0009-2026-11-25-formulario-entradas.md))
 
 **Fases 2–4:** sin empezar.
 

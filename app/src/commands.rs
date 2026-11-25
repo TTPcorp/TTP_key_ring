@@ -6,7 +6,10 @@
 use secrecy::SecretString;
 use tauri::State;
 
-use crate::state::{AppError, AppState, EntrySummary, VaultStatus};
+use crate::state::{
+    self, AppError, AppState, EntryDetails, EntryForm, EntrySummary, GeneratedPassword,
+    GeneratorForm, Revealed, SecretField, VaultStatus,
+};
 
 #[tauri::command]
 pub fn vault_status(state: State<'_, AppState>) -> Result<VaultStatus, AppError> {
@@ -40,4 +43,44 @@ pub fn list_entries(
     query: String,
 ) -> Result<Vec<EntrySummary>, AppError> {
     state.list(&query)
+}
+
+#[tauri::command]
+pub fn get_entry(state: State<'_, AppState>, id: String) -> Result<EntryDetails, AppError> {
+    state.get(&id)
+}
+
+/// Sends one secret to the frontend. The UI only calls it when the user
+/// presses "Mostrar" on that field.
+#[tauri::command]
+pub fn reveal_secret(
+    state: State<'_, AppState>,
+    id: String,
+    field: SecretField,
+) -> Result<Revealed, AppError> {
+    state.reveal(&id, field)
+}
+
+#[tauri::command]
+pub fn add_entry(state: State<'_, AppState>, entry: EntryForm) -> Result<String, AppError> {
+    state.add(entry)
+}
+
+#[tauri::command]
+pub fn update_entry(
+    state: State<'_, AppState>,
+    id: String,
+    entry: EntryForm,
+) -> Result<(), AppError> {
+    state.update(&id, entry)
+}
+
+#[tauri::command]
+pub fn delete_entry(state: State<'_, AppState>, id: String) -> Result<(), AppError> {
+    state.delete(&id)
+}
+
+#[tauri::command]
+pub fn generate_password(options: GeneratorForm) -> Result<GeneratedPassword, AppError> {
+    state::generate_password(options)
 }
