@@ -75,10 +75,9 @@ Al bloquearse, la clave y los secretos se borran de la memoria y se limpia el po
   - Treinta interacciones seguidas generan un solo aviso de actividad.
   - Cuando el backend bloquea, la pantalla cambia en menos de 2 s y muestra el motivo correcto en los dos casos.
   - Sin errores en la consola.
-- **Pendiente de probar a mano en Windows:**
-  1. Abrir el llavero y pulsar Win+L.
-  2. Al volver, debe estar bloqueado y decir «al bloquear la sesión de Windows».
-  3. Dejarlo abierto 5 minutos sin tocarlo: debe bloquearse.
+- **Prueba manual en Windows: correcta.** El responsable del proyecto lo comprobó el 2026-11-25 con la app real (ver el informe 0014):
+  1. Con el llavero abierto, al pulsar Win+L y volver, el llavero está bloqueado.
+  2. Tras 5 minutos sin tocarlo, se bloquea solo.
 
 ## Pendiente / siguientes pasos
 - **Fase 1 terminada.** Siguiente: **Fase 2 (auto-type en programas)**: traits de plataforma para el atajo global, la ventana activa y la escritura simulada, con su implementación para Windows.
