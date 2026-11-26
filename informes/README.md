@@ -57,3 +57,4 @@ Qué se ha hecho y para qué, en dos o tres frases.
 | [0016](0016-2026-11-26-ventana-activa-y-escritura.md) | 2026-11-26 | Ventana activa y escritura simulada en Windows (auto-type) | 2 |
 | [0017](0017-2026-11-26-atajo-global.md) | 2026-11-26 | Atajo de teclado global para el auto-type (Windows) | 2 |
 | [0018](0018-2026-11-26-flujo-auto-type.md) | 2026-11-26 | Flujo de auto-type en la app: atajo, selector de entradas y avisos | 2 |
+| [0019](0019-2026-11-26-formulario-auto-type.md) | 2026-11-26 | Ventanas asociadas y secuencia de auto-type en el formulario | 2 |

@@ -21,6 +21,7 @@
     "allow-user-activity",
     "allow-autotype-notice",
     "allow-autotype-choose",
-    "allow-autotype-cancel"
+    "allow-autotype-cancel",
+    "allow-check-autotype-sequence"
   ]
 }

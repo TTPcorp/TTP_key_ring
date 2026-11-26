@@ -10,7 +10,8 @@ use tauri::State;
 use crate::autotype::{AutoTypeFlow, Notice};
 use crate::state::{
     self, AppError, AppState, CopyField, EntryDetails, EntryForm, EntrySummary, GeneratedPassword,
-    GeneratorForm, Revealed, SecretField, StrengthContext, VaultStatus, WebAddressInfo,
+    GeneratorForm, Revealed, SecretField, SequenceProblem, StrengthContext, VaultStatus,
+    WebAddressInfo,
 };
 
 #[tauri::command]
@@ -90,6 +91,12 @@ pub async fn delete_entry(
 #[tauri::command]
 pub fn generate_password(options: GeneratorForm) -> Result<GeneratedPassword, AppError> {
     state::generate_password(options)
+}
+
+/// Live check of the auto-type sequence typed in the form.
+#[tauri::command]
+pub fn check_autotype_sequence(sequence: String) -> Option<SequenceProblem> {
+    state::check_autotype_sequence(&sequence)
 }
 
 #[tauri::command]
