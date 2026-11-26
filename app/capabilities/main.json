@@ -18,6 +18,9 @@
     "allow-check-url",
     "allow-estimate-strength",
     "allow-copy-to-clipboard",
-    "allow-user-activity"
+    "allow-user-activity",
+    "allow-autotype-notice",
+    "allow-autotype-choose",
+    "allow-autotype-cancel"
   ]
 }

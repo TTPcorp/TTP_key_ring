@@ -315,7 +315,50 @@ fn wildcard_match(pattern: &str, text: &str) -> bool {
     pattern.iter().skip(p).all(|&c| c == '*')
 }
 
+impl WindowMatch {
+    /// Whether this association names an executable. A window title can be
+    /// set by any program or web page; the executable cannot be faked that
+    /// easily, so only associations that check it allow typing without
+    /// asking first.
+    pub fn checks_process(&self) -> bool {
+        self.process
+            .as_deref()
+            .is_some_and(|p| !p.trim().is_empty())
+    }
+}
+
+/// What auto-type should do for the active window.
+#[derive(Debug)]
+pub enum AutoTypeChoice<'a> {
+    /// No entry is associated with the window: type nothing.
+    NoMatch,
+    /// Exactly one entry matches, through an association that checks the
+    /// executable: type it without asking (decided by the project owner,
+    /// 2026-11-26).
+    TypeDirectly(&'a Entry),
+    /// Several entries match, or the only match relies on the window
+    /// title alone: the user must pick (or confirm) the entry first.
+    Choose(Vec<&'a Entry>),
+}
+
 impl VaultData {
+    /// Decides between typing directly and asking the user first.
+    pub fn autotype_choice<'a>(&'a self, window: &'a TargetWindow) -> AutoTypeChoice<'a> {
+        let entries: Vec<&Entry> = self.entries_for_window(window).collect();
+        match entries.as_slice() {
+            [] => AutoTypeChoice::NoMatch,
+            [entry]
+                if entry
+                    .windows()
+                    .iter()
+                    .any(|w| w.checks_process() && w.matches(window)) =>
+            {
+                AutoTypeChoice::TypeDirectly(entry)
+            }
+            _ => AutoTypeChoice::Choose(entries),
+        }
+    }
+
     /// Entries associated with `window`, in vault order.
     pub fn entries_for_window<'a>(
         &'a self,
@@ -549,5 +592,88 @@ mod tests {
         let names: Vec<&str> = vault.entries_for_window(&target).map(Entry::name).collect();
         assert_eq!(names, ["A", "B"]);
         assert_eq!(vault.entries_for_window(&window("x", None)).count(), 0);
+    }
+
+    fn choice_names(choice: &AutoTypeChoice<'_>) -> (&'static str, Vec<String>) {
+        match choice {
+            AutoTypeChoice::NoMatch => ("none", vec![]),
+            AutoTypeChoice::TypeDirectly(e) => ("direct", vec![e.name().to_owned()]),
+            AutoTypeChoice::Choose(list) => {
+                ("choose", list.iter().map(|e| e.name().to_owned()).collect())
+            }
+        }
+    }
+
+    fn vault_of(entries: Vec<(&str, Vec<WindowMatch>)>) -> VaultData {
+        let mut vault = VaultData::new().unwrap();
+        for (name, windows) in entries {
+            let mut input = EntryInput::new(name, "u", SecretString::from("p"));
+            input.windows = windows;
+            vault.add_entry(input).unwrap();
+        }
+        vault
+    }
+
+    #[test]
+    fn checks_process_ignores_blank_names() {
+        assert!(matcher(None, Some("erp.exe")).checks_process());
+        assert!(!matcher(Some("ERP*"), None).checks_process());
+        assert!(!matcher(Some("ERP*"), Some("  ")).checks_process());
+    }
+
+    #[test]
+    fn single_match_by_executable_types_directly() {
+        let vault = vault_of(vec![
+            ("A", vec![matcher(None, Some("erp.exe"))]),
+            ("B", vec![matcher(Some("Other"), None)]),
+        ]);
+        let target = window("ERP - Login", Some("erp.exe"));
+        assert_eq!(
+            choice_names(&vault.autotype_choice(&target)),
+            ("direct", vec!["A".to_owned()])
+        );
+        // Title and executable together also count as checking it.
+        let vault = vault_of(vec![("A", vec![matcher(Some("ERP*"), Some("erp.exe"))])]);
+        assert_eq!(choice_names(&vault.autotype_choice(&target)).0, "direct");
+    }
+
+    #[test]
+    fn single_match_by_title_only_asks_first() {
+        // The executable-based association does not match this window;
+        // only the title one does.
+        let vault = vault_of(vec![(
+            "A",
+            vec![
+                matcher(None, Some("other.exe")),
+                matcher(Some("ERP*"), None),
+            ],
+        )]);
+        let target = window("ERP - Login", Some("erp.exe"));
+        assert_eq!(
+            choice_names(&vault.autotype_choice(&target)),
+            ("choose", vec!["A".to_owned()])
+        );
+    }
+
+    #[test]
+    fn several_matches_ask_first_even_by_executable() {
+        let vault = vault_of(vec![
+            ("A", vec![matcher(None, Some("erp.exe"))]),
+            ("B", vec![matcher(None, Some("ERP.EXE"))]),
+        ]);
+        let target = window("ERP", Some("erp.exe"));
+        assert_eq!(
+            choice_names(&vault.autotype_choice(&target)),
+            ("choose", vec!["A".to_owned(), "B".to_owned()])
+        );
+    }
+
+    #[test]
+    fn no_match_types_nothing() {
+        let vault = vault_of(vec![("A", vec![matcher(None, Some("erp.exe"))])]);
+        assert_eq!(
+            choice_names(&vault.autotype_choice(&window("ERP", None))).0,
+            "none"
+        );
     }
 }

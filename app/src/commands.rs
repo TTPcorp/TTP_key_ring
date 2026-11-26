@@ -7,6 +7,7 @@ use llavero_core::strength::StrengthEstimate;
 use secrecy::SecretString;
 use tauri::State;
 
+use crate::autotype::{AutoTypeFlow, Notice};
 use crate::state::{
     self, AppError, AppState, CopyField, EntryDetails, EntryForm, EntrySummary, GeneratedPassword,
     GeneratorForm, Revealed, SecretField, StrengthContext, VaultStatus, WebAddressInfo,
@@ -122,4 +123,38 @@ pub async fn copy_to_clipboard(
 #[tauri::command]
 pub fn user_activity(state: State<'_, AppState>) {
     state.touch();
+}
+
+/// What the last press of the auto-type shortcut needs to tell the user
+/// (polled by the UI; each notice is returned once).
+#[tauri::command]
+pub fn autotype_notice(flow: State<'_, AutoTypeFlow>) -> Option<Notice> {
+    flow.take_notice()
+}
+
+/// Types the entry the user picked for a pending shortcut press into the
+/// window captured at that press. The app minimizes itself first so that
+/// window returns to the foreground; on failure it comes back.
+#[tauri::command]
+pub async fn autotype_choose(
+    state: State<'_, AppState>,
+    flow: State<'_, AutoTypeFlow>,
+    window: tauri::WebviewWindow,
+    request_id: String,
+    entry_id: String,
+) -> Result<(), AppError> {
+    let result = flow.choose(&state, &request_id, &entry_id, || {
+        let _ = window.minimize();
+    });
+    if result.is_err() {
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+    result
+}
+
+/// The user closed the picker without choosing.
+#[tauri::command]
+pub fn autotype_cancel(flow: State<'_, AutoTypeFlow>, request_id: String) {
+    flow.cancel(&request_id);
 }

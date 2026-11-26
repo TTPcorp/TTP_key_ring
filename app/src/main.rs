@@ -3,10 +3,14 @@
 // No console window in release builds on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod autotype;
 mod commands;
 mod state;
 
+use autotype::AutoTypeFlow;
+use llavero_platform::{Hotkey, HotkeyError, SystemAutoType};
 use state::AppState;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::Manager;
 
@@ -18,6 +22,10 @@ fn main() {
 
     let result = tauri::Builder::default()
         .manage(AppState::new(vault_path))
+        .manage(AutoTypeFlow::new(
+            Arc::new(SystemAutoType::new()),
+            Hotkey::DEFAULT.to_string(),
+        ))
         .invoke_handler(tauri::generate_handler![
             commands::vault_status,
             commands::create_vault,
@@ -34,6 +42,9 @@ fn main() {
             commands::estimate_strength,
             commands::copy_to_clipboard,
             commands::user_activity,
+            commands::autotype_notice,
+            commands::autotype_choose,
+            commands::autotype_cancel,
         ])
         .setup(|app| {
             // Auto-lock watcher: every 2 s, lock the vault if the Windows
@@ -48,6 +59,7 @@ fn main() {
                         .auto_lock(Instant::now(), session_locked);
                 }
             });
+            start_autotype(app);
             Ok(())
         })
         .build(tauri::generate_context!());
@@ -65,4 +77,39 @@ fn main() {
             handle.state::<AppState>().clear_clipboard_now();
         }
     });
+}
+
+/// Keeps the global shortcut registered for the lifetime of the app.
+struct HotkeyGuard(#[allow(dead_code)] llavero_platform::HotkeyRegistration);
+
+/// Registers the auto-type shortcut. Its listener only queues the press;
+/// a worker thread runs the flow and shows the window when there is
+/// something to tell the user.
+fn start_autotype(app: &mut tauri::App) {
+    let (presses, pressed) = std::sync::mpsc::channel::<()>();
+    let handle = app.handle().clone();
+    std::thread::spawn(move || {
+        while pressed.recv().is_ok() {
+            let show = handle
+                .state::<AutoTypeFlow>()
+                .on_hotkey(&handle.state::<AppState>());
+            if show && let Some(window) = handle.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }
+    });
+    match llavero_platform::register_hotkey(Hotkey::DEFAULT, move || {
+        let _ = presses.send(());
+    }) {
+        Ok(registration) => {
+            app.manage(HotkeyGuard(registration));
+        }
+        // Not available on this OS yet: auto-type is simply absent.
+        Err(HotkeyError::Unsupported) => {}
+        Err(HotkeyError::AlreadyInUse | HotkeyError::Invalid | HotkeyError::Failed) => {
+            app.state::<AutoTypeFlow>().hotkey_unavailable();
+        }
+    }
 }

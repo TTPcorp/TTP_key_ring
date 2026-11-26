@@ -22,6 +22,9 @@ fn main() {
             "estimate_strength",
             "copy_to_clipboard",
             "user_activity",
+            "autotype_notice",
+            "autotype_choose",
+            "autotype_cancel",
         ]));
     if let Err(error) = tauri_build::try_build(attributes) {
         eprintln!("tauri build script failed: {error:#}");

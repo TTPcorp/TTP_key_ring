@@ -19,8 +19,9 @@ pub const KEY_DELAY: Duration = Duration::from_millis(10);
 pub struct WindowId(usize);
 
 impl WindowId {
-    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
-    pub(crate) fn from_raw(raw: usize) -> Self {
+    /// Wraps a raw OS window handle. Public so that tests elsewhere can
+    /// simulate windows; it grants nothing, as ids are only compared.
+    pub fn from_raw(raw: usize) -> Self {
         Self(raw)
     }
 }

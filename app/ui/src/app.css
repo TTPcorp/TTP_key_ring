@@ -481,3 +481,37 @@ select {
 .delete-confirm p {
   margin: 0;
 }
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(0 0 0 / 45%);
+}
+
+.autotype-picker {
+  width: min(480px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+.autotype-picker h2 {
+  margin: 0 0 8px;
+  font-size: 1.2rem;
+}
+
+.autotype-picker .entries li {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.autotype-picker .entries li:hover {
+  border-color: var(--accent);
+}
+
+.autotype-picker .actions {
+  margin-top: 12px;
+}
