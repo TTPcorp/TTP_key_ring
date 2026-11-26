@@ -16,10 +16,9 @@ pub(crate) fn set_secret_text(
 /// `WTSQuerySessionInformationW(WTSSessionInfoEx)`, the documented way
 /// to ask Windows 10/11 whether the session is locked.
 ///
-/// This is the only `unsafe` code in the project: Windows exposes this
-/// only through its C API and no safe crate wraps it. The exception was
-/// approved by the project owner (report 0013) and is limited to this
-/// function.
+/// Windows exposes this only through its C API and no safe crate wraps
+/// it. The `unsafe` exception was approved by the project owner (report
+/// 0013) and is limited to this function.
 #[allow(unsafe_code)]
 pub(crate) fn is_session_locked() -> Option<bool> {
     use windows_sys::Win32::System::RemoteDesktop::{
@@ -68,4 +67,197 @@ pub(crate) fn is_session_locked() -> Option<bool> {
     // is not used after this call.
     unsafe { WTSFreeMemory(buffer.cast()) };
     state
+}
+
+// ---------------------------------------------------------------------
+// Auto-type (Phase 2).
+//
+// These functions call the Windows C API through `windows-sys`. Each
+// `unsafe` block is as small as possible and carries a `SAFETY` comment.
+// The exception was approved by the project owner (report 0016), who
+// prefers our own audited calls over third-party input crates.
+// ---------------------------------------------------------------------
+
+use std::os::windows::ffi::OsStringExt;
+use std::path::PathBuf;
+
+use windows_sys::Win32::Foundation::{CloseHandle, HWND};
+use windows_sys::Win32::System::Threading::{
+    OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
+};
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+    GetAsyncKeyState, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
+    KEYEVENTF_UNICODE, SendInput, VIRTUAL_KEY, VK_CONTROL, VK_LWIN, VK_MENU, VK_RETURN, VK_RWIN,
+    VK_SHIFT, VK_TAB,
+};
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    GetForegroundWindow, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId,
+};
+use zeroize::{DefaultIsZeroes, Zeroizing};
+
+use crate::autotype::{ActiveWindow, AutoTypeError, Backend, KEY_DELAY, SpecialKey, WindowId};
+
+/// Longest window title read, in UTF-16 units.
+const MAX_TITLE_UNITS: usize = 4096;
+/// Longest executable path read (the Windows long-path limit).
+const MAX_PATH_UNITS: usize = 32_768;
+
+/// `INPUT` wrapper so the events (which hold the typed characters) can be
+/// wiped with `zeroize` once sent. `INPUT::default()` is all zeroes.
+#[repr(transparent)]
+#[derive(Clone, Copy, Default)]
+struct RawInput(INPUT);
+
+impl DefaultIsZeroes for RawInput {}
+
+fn key_event(vk: VIRTUAL_KEY, scan: u16, flags: u32) -> RawInput {
+    RawInput(INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: vk,
+                wScan: scan,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    })
+}
+
+/// Sends the events with `SendInput`, which inserts them as one block
+/// that other input cannot interleave with.
+#[allow(unsafe_code)]
+fn send_inputs(inputs: &[RawInput]) -> Result<(), AutoTypeError> {
+    let count = u32::try_from(inputs.len()).map_err(|_| AutoTypeError::Blocked)?;
+    let size = i32::try_from(std::mem::size_of::<INPUT>()).map_err(|_| AutoTypeError::Blocked)?;
+    // SAFETY: `RawInput` is `repr(transparent)` over `INPUT`, so the slice
+    // is `count` valid, initialized `INPUT` values; Windows only reads them
+    // during the call.
+    let sent = unsafe { SendInput(count, inputs.as_ptr().cast::<INPUT>(), size) };
+    // UIPI (a target with higher privileges) makes the call insert nothing.
+    if sent == count {
+        Ok(())
+    } else {
+        Err(AutoTypeError::Blocked)
+    }
+}
+
+/// `GetForegroundWindow` and `GetAsyncKeyState` + `SendInput` behind the
+/// guarded auto-type logic in `crate::autotype`.
+pub(crate) struct OsBackend;
+
+impl Backend for OsBackend {
+    #[allow(unsafe_code)]
+    fn foreground(&self) -> Option<WindowId> {
+        // SAFETY: no arguments; returns a handle (possibly null) that is
+        // only compared, never dereferenced.
+        let hwnd: HWND = unsafe { GetForegroundWindow() };
+        (!hwnd.is_null()).then(|| WindowId::from_raw(hwnd as usize))
+    }
+
+    #[allow(unsafe_code)]
+    fn modifiers_pressed(&self) -> bool {
+        [VK_SHIFT, VK_CONTROL, VK_MENU, VK_LWIN, VK_RWIN]
+            .into_iter()
+            .any(|vk| {
+                // SAFETY: plain query of a virtual-key code; no pointers.
+                let state = unsafe { GetAsyncKeyState(i32::from(vk)) };
+                // The high bit (negative value) means "down right now".
+                state < 0
+            })
+    }
+
+    fn send_char(&self, ch: char) -> Result<(), AutoTypeError> {
+        // KEYEVENTF_UNICODE types the character itself, whatever the
+        // keyboard layout. Characters outside the BMP are two UTF-16
+        // units, each sent as its own press and release.
+        let mut units = Zeroizing::new([0u16; 2]);
+        let encoded_len = ch.encode_utf16(&mut *units).len();
+        let mut inputs = Zeroizing::new([RawInput::default(); 4]);
+        for (i, unit) in units.iter().take(encoded_len).enumerate() {
+            inputs[2 * i] = key_event(0, *unit, KEYEVENTF_UNICODE);
+            inputs[2 * i + 1] = key_event(0, *unit, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP);
+        }
+        send_inputs(inputs.get(..2 * encoded_len).unwrap_or_default())
+    }
+
+    fn send_key(&self, key: SpecialKey) -> Result<(), AutoTypeError> {
+        let vk = match key {
+            SpecialKey::Tab => VK_TAB,
+            SpecialKey::Enter => VK_RETURN,
+        };
+        send_inputs(&[key_event(vk, 0, 0), key_event(vk, 0, KEYEVENTF_KEYUP)])
+    }
+
+    fn pause(&self) {
+        std::thread::sleep(KEY_DELAY);
+    }
+}
+
+/// Foreground window with its title and executable path.
+#[allow(unsafe_code)]
+pub(crate) fn active_window() -> Option<ActiveWindow> {
+    // SAFETY: no arguments; the handle is only passed back to the
+    // read-only queries below, which accept stale handles (they fail).
+    let hwnd: HWND = unsafe { GetForegroundWindow() };
+    if hwnd.is_null() {
+        return None;
+    }
+    Some(ActiveWindow {
+        id: WindowId::from_raw(hwnd as usize),
+        title: window_title(hwnd),
+        executable: window_executable(hwnd),
+    })
+}
+
+#[allow(unsafe_code)]
+fn window_title(hwnd: HWND) -> String {
+    // SAFETY: read-only query on a window handle; returns 0 on failure.
+    let len = unsafe { GetWindowTextLengthW(hwnd) };
+    let Ok(len) = usize::try_from(len) else {
+        return String::new();
+    };
+    let capacity = len.min(MAX_TITLE_UNITS) + 1;
+    let mut buffer = vec![0u16; capacity];
+    let Ok(max) = i32::try_from(capacity) else {
+        return String::new();
+    };
+    // SAFETY: `buffer` has room for `max` UTF-16 units including the
+    // terminating null, which is what `nmaxcount` declares.
+    let copied = unsafe { GetWindowTextW(hwnd, buffer.as_mut_ptr(), max) };
+    let copied = usize::try_from(copied).unwrap_or(0).min(capacity);
+    String::from_utf16_lossy(buffer.get(..copied).unwrap_or_default())
+}
+
+#[allow(unsafe_code)]
+fn window_executable(hwnd: HWND) -> Option<PathBuf> {
+    let mut pid: u32 = 0;
+    // SAFETY: `pid` is a valid, writable local.
+    unsafe { GetWindowThreadProcessId(hwnd, &mut pid) };
+    if pid == 0 {
+        return None;
+    }
+    // SAFETY: plain call; the least privileged right that allows reading
+    // the image name. Fails (null) for protected processes.
+    let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    if process.is_null() {
+        return None;
+    }
+    let mut buffer = vec![0u16; MAX_PATH_UNITS];
+    let mut size = u32::try_from(buffer.len()).unwrap_or(0);
+    // SAFETY: `process` is a valid handle opened above; `buffer` has room
+    // for `size` units and `size` is a writable local updated with the
+    // number of units written (without the null).
+    let ok = unsafe {
+        QueryFullProcessImageNameW(process, PROCESS_NAME_WIN32, buffer.as_mut_ptr(), &mut size)
+    };
+    // SAFETY: `process` was opened above and is closed exactly once.
+    unsafe { CloseHandle(process) };
+    if ok == 0 {
+        return None;
+    }
+    let len = usize::try_from(size).unwrap_or(0).min(buffer.len());
+    let units = buffer.get(..len)?;
+    Some(PathBuf::from(std::ffi::OsString::from_wide(units)))
 }

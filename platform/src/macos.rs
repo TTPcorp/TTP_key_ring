@@ -16,3 +16,27 @@ pub(crate) fn set_secret_text(
 pub(crate) fn is_session_locked() -> Option<bool> {
     None
 }
+
+/// Auto-type is not implemented yet on macOS (Phase 4).
+pub(crate) fn active_window() -> Option<ActiveWindow> {
+    None
+}
+
+/// Auto-type backend that refuses everything (Phase 4).
+pub(crate) struct OsBackend;
+
+impl Backend for OsBackend {
+    fn foreground(&self) -> Option<WindowId> {
+        None
+    }
+    fn modifiers_pressed(&self) -> bool {
+        false
+    }
+    fn send_char(&self, _ch: char) -> Result<(), AutoTypeError> {
+        Err(AutoTypeError::Unsupported)
+    }
+    fn send_key(&self, _key: SpecialKey) -> Result<(), AutoTypeError> {
+        Err(AutoTypeError::Unsupported)
+    }
+    fn pause(&self) {}
+}

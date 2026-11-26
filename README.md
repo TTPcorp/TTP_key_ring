@@ -2,7 +2,7 @@
 
 Gestor de contraseñas de escritorio para uso interno. Guarda las credenciales de páginas web y programas de forma **local y cifrada**, y las **rellena automáticamente** en ambos. Permite usar contraseñas largas y únicas sin depender de ningún servicio en la nube: la aplicación no se conecta a internet.
 
-> **Estado:** Fases 0 y 1 (MVP) terminadas. La app de escritorio permite crear o abrir el llavero cifrado; ver, buscar, añadir, editar y borrar entradas (con generador por entropía, barra de seguridad también mientras se escribe y comprobación de direcciones web); copiar el usuario o la contraseña al portapapeles con borrado automático; cambiar entre tema claro y oscuro; y bloquearlo a mano, tras 5 minutos sin actividad o al bloquear la sesión de Windows. En curso: Fase 2 (auto-type en programas); ya están las secuencias y la asociación de entradas con ventanas. Detalle en [Avances](#avances) y en [`informes/`](informes/).
+> **Estado:** Fases 0 y 1 (MVP) terminadas. La app de escritorio permite crear o abrir el llavero cifrado; ver, buscar, añadir, editar y borrar entradas (con generador por entropía, barra de seguridad también mientras se escribe y comprobación de direcciones web); copiar el usuario o la contraseña al portapapeles con borrado automático; cambiar entre tema claro y oscuro; y bloquearlo a mano, tras 5 minutos sin actividad o al bloquear la sesión de Windows. En curso: Fase 2 (auto-type en programas); ya están las secuencias, la asociación de entradas con ventanas y, en Windows, la lectura de la ventana activa y la escritura simulada. Detalle en [Avances](#avances) y en [`informes/`](informes/).
 
 ## Características
 
@@ -21,7 +21,7 @@ Leyenda: ✅ disponible · 🚧 en desarrollo · 📋 prevista
 | Comprobación sin conexión de direcciones web (formato, http, IP, caracteres engañosos) | ✅ Fase 1 |
 | Borrado de entradas protegido con la contraseña maestra | ✅ Fase 1 |
 | Guardado atómico y copia de seguridad automática (`.bak`) del archivo cifrado | ✅ Fase 1 (exportar una copia desde la app: menú de ajustes, Fase 4) |
-| Auto-type en programas con atajo de teclado global | 🚧 Fase 2 (secuencias y asociación con ventanas en el `core`) |
+| Auto-type en programas con atajo de teclado global | 🚧 Fase 2 (secuencias, asociación con ventanas, ventana activa y escritura simulada en Windows) |
 | Extensión de navegador con autorrelleno y coincidencia exacta de dominio | 📋 Fase 3 |
 | Importación desde navegadores (CSV), carpetas y etiquetas | 📋 Fase 4 |
 | Auditoría de contraseñas débiles o repetidas | 📋 Fase 4 |
@@ -51,7 +51,7 @@ Extensión navegador  ◄── Native Messaging (local) ──►  App de escri
 | Carpeta | Crate | Responsabilidad |
 |---|---|---|
 | `core/` | `llavero-core` | Lógica pura y portable: formato del llavero, cifrado, modelo de entradas, generador de contraseñas, estimación de la fuerza de contraseñas, comprobación de direcciones web, secuencias de auto-type, búsqueda y coincidencia. Sin dependencias del SO ni de Tauri. Con tests unitarios. |
-| `platform/` | `llavero-platform` | Traits comunes e implementaciones por sistema (`windows` ahora; `linux` y `macos` en el futuro). Ya incluye el portapapeles y la detección de sesión bloqueada. |
+| `platform/` | `llavero-platform` | Traits comunes e implementaciones por sistema (`windows` ahora; `linux` y `macos` en el futuro). Ya incluye el portapapeles, la detección de sesión bloqueada, la ventana activa y la escritura simulada. |
 | `app/` | `llavero-app` | Aplicación Tauri: interfaz y comandos. |
 | `native-host/` | `llavero-native-host` | Puente Native Messaging entre la extensión y la app. |
 | `extension/` | — | Extensión de navegador (WebExtensions MV3; no es un crate de Rust). |
@@ -158,7 +158,8 @@ Leyenda: ✅ hecho · 🚧 en curso · ⬜ pendiente. Cada avance tiene su infor
 
 **Fase 2 — Auto-type en programas**
 - ✅ Secuencias de auto-type (por defecto `{USERNAME}{TAB}{PASSWORD}{ENTER}`) y asociación de entradas con ventanas (título con comodín `*`, nombre del ejecutable) en `core::autotype` ([0015](informes/0015-2026-11-25-secuencias-auto-type.md))
-- ⬜ Traits de plataforma e implementación para Windows: ventana activa, escritura simulada y atajo global
+- ✅ Traits de plataforma e implementación para Windows de la ventana activa y la escritura simulada, con parada si cambia la ventana o se pulsa un modificador ([0016](informes/0016-2026-11-26-ventana-activa-y-escritura.md))
+- ⬜ Atajo de teclado global (Windows)
 - ⬜ Auto-type en la app y campos de ventanas y secuencia en el formulario
 - ⬜ Comprobación de los programas asociados (ejecutable y firma digital)
 

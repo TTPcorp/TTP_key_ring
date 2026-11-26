@@ -5,9 +5,13 @@
 //! storage) is exposed here as a trait, with one implementation per OS
 //! selected via `#[cfg(target_os = "...")]`.
 
+pub mod autotype;
 pub mod clipboard;
 pub mod session;
 
+pub use autotype::{
+    ActiveWindow, AutoType, AutoTypeError, KEY_DELAY, SpecialKey, SystemAutoType, WindowId,
+};
 pub use clipboard::{Clipboard, ClipboardError, SystemClipboard, clear_if_unchanged};
 pub use session::is_session_locked;
 
