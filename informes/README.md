@@ -54,3 +54,4 @@ Qué se ha hecho y para qué, en dos o tres frases.
 | [0013](0013-2026-11-25-bloqueo-automatico.md) | 2026-11-25 | Bloqueo automático por inactividad y al bloquear la sesión de Windows (cierre de la Fase 1) | 1 |
 | [0014](0014-2026-11-25-verificacion-manual-windows.md) | 2026-11-25 | Verificación manual en Windows del portapapeles y del bloqueo automático | 1 |
 | [0015](0015-2026-11-25-secuencias-auto-type.md) | 2026-11-25 | Inicio de la Fase 2: secuencias de auto-type y asociación con ventanas | 2 |
+| [0016](0016-2026-11-26-ventana-activa-y-escritura.md) | 2026-11-26 | Ventana activa y escritura simulada en Windows (auto-type) | 2 |
