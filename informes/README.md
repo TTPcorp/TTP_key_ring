@@ -16,7 +16,7 @@ Cada modificación del proyecto deja aquí un informe. Así se puede seguir qué
 # NNNN — Título
 
 - **Fecha:** AAAA-MM-DD
-- **Fase:** 0 / 1 / 2 / 3 / 4
+- **Fase:** 0 / 1 / 2 / 3 / 4 / 5
 - **Commits:** abc1234
 
 ## Resumen
@@ -58,3 +58,4 @@ Qué se ha hecho y para qué, en dos o tres frases.
 | [0017](0017-2026-11-26-atajo-global.md) | 2026-11-26 | Atajo de teclado global para el auto-type (Windows) | 2 |
 | [0018](0018-2026-11-26-flujo-auto-type.md) | 2026-11-26 | Flujo de auto-type en la app: atajo, selector de entradas y avisos | 2 |
 | [0019](0019-2026-11-26-formulario-auto-type.md) | 2026-11-26 | Ventanas asociadas y secuencia de auto-type en el formulario | 2 |
+| [0020](0020-2026-11-26-fase-puesta-a-prueba.md) | 2026-11-26 | Nueva Fase 5 en la hoja de ruta: puesta a prueba | 5 |

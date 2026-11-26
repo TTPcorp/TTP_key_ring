@@ -165,7 +165,7 @@ Leyenda: ✅ hecho · 🚧 en curso · ⬜ pendiente. Cada avance tiene su infor
 - ⬜ Prueba manual en Windows de todo el flujo (pasos en [0019](informes/0019-2026-11-26-formulario-auto-type.md))
 - ⬜ Comprobación de los programas asociados (ejecutable y firma digital)
 
-**Fases 3–4:** sin empezar.
+**Fases 3–5:** sin empezar.
 
 ## Hoja de ruta
 
@@ -195,6 +195,11 @@ Importancia: **Crítica** (bloquea lo demás o compromete la seguridad) · **Alt
 - Media: diccionarios en español para el estimador de fuerza (palabras, nombres y contraseñas comunes).
 - Media: menú de ajustes: cambiar la contraseña maestra, exportar una copia de seguridad, tiempo de bloqueo por inactividad y de borrado del portapapeles, y tema (con iconos, más discreto).
 - Baja: auditoría de contraseñas débiles o repetidas (con el estimador de fuerza); port a Linux y macOS (incluida la detección de sesión bloqueada).
+
+**Fase 5 — Puesta a prueba**
+- Alta: preparación gráfica: diseño visual coherente (iconos, colores, tipografía, icono de la aplicación) y revisión de accesibilidad (contraste, teclado, lectores de pantalla), siempre sin recursos cargados de la red.
+- Alta: adaptación para que sea fácil de usar: primer arranque guiado (crear el llavero y explicar que la contraseña maestra no se puede recuperar), textos y mensajes de error claros, y ayuda breve dentro de la app.
+- Alta: pruebas beta con usuarios cercanos: instalador para Windows, guía de instalación y de uso, y una forma sencilla de enviar comentarios y errores a mano (sin telemetría ni envíos automáticos). Recoger los resultados y corregir lo encontrado antes de la primera versión pública.
 
 **Transversal:** tests del `core` y revisión de seguridad en cada fase.
 
