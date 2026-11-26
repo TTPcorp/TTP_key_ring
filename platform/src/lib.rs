@@ -7,12 +7,14 @@
 
 pub mod autotype;
 pub mod clipboard;
+pub mod hotkey;
 pub mod session;
 
 pub use autotype::{
     ActiveWindow, AutoType, AutoTypeError, KEY_DELAY, SpecialKey, SystemAutoType, WindowId,
 };
 pub use clipboard::{Clipboard, ClipboardError, SystemClipboard, clear_if_unchanged};
+pub use hotkey::{Hotkey, HotkeyError, HotkeyRegistration, Modifiers, register_hotkey};
 pub use session::is_session_locked;
 
 #[cfg(target_os = "windows")]

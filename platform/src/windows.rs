@@ -261,3 +261,161 @@ fn window_executable(hwnd: HWND) -> Option<PathBuf> {
     let units = buffer.get(..len)?;
     Some(PathBuf::from(std::ffi::OsString::from_wide(units)))
 }
+
+// ---------------------------------------------------------------------
+// Global shortcut for auto-type (Phase 2), within the same approval
+// (report 0016). `RegisterHotKey` with no window posts `WM_HOTKEY` to the
+// registering thread, so a dedicated thread owns the shortcut and runs a
+// message loop; posting `WM_QUIT` to it unregisters and ends it.
+// ---------------------------------------------------------------------
+
+use std::sync::mpsc::Sender;
+use std::thread::JoinHandle;
+
+use windows_sys::Win32::Foundation::{ERROR_HOTKEY_ALREADY_REGISTERED, GetLastError};
+use windows_sys::Win32::System::Threading::GetCurrentThreadId;
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+    HOT_KEY_MODIFIERS, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, MOD_SHIFT, MOD_WIN, RegisterHotKey,
+    UnregisterHotKey,
+};
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    GetMessageW, MSG, PM_NOREMOVE, PeekMessageW, PostThreadMessageW, WM_HOTKEY, WM_QUIT, WM_USER,
+};
+
+use crate::hotkey::{Hotkey, HotkeyError};
+
+/// Identifier of our shortcut within the listener thread.
+const HOTKEY_ID: i32 = 1;
+
+/// The listener thread of a registered shortcut.
+#[derive(Debug)]
+pub(crate) struct HotkeyHandle {
+    thread_id: u32,
+    thread: Option<JoinHandle<()>>,
+}
+
+impl Drop for HotkeyHandle {
+    #[allow(unsafe_code)]
+    fn drop(&mut self) {
+        // SAFETY: plain call with integer arguments; `thread_id` is the
+        // listener thread, whose message queue exists (created before its
+        // id was handed out).
+        let posted = unsafe { PostThreadMessageW(self.thread_id, WM_QUIT, 0, 0) };
+        let Some(thread) = self.thread.take() else {
+            return;
+        };
+        // Wait for the thread to unregister the shortcut. Never wait if the
+        // message could not be posted (it would wait forever) or if the
+        // handle is dropped from the callback itself (the thread would wait
+        // for itself); in both cases the thread is left to end on its own.
+        if posted != 0 && thread.thread().id() != std::thread::current().id() {
+            let _ = thread.join();
+        }
+    }
+}
+
+pub(crate) fn register_hotkey(
+    hotkey: Hotkey,
+    on_press: Box<dyn Fn() + Send>,
+) -> Result<HotkeyHandle, HotkeyError> {
+    let (ready_tx, ready_rx) = std::sync::mpsc::channel();
+    let thread = std::thread::Builder::new()
+        .name("llavero-hotkey".into())
+        .spawn(move || hotkey_thread(hotkey, on_press, ready_tx))
+        .map_err(|_| HotkeyError::Failed)?;
+    match ready_rx.recv() {
+        Ok(Ok(thread_id)) => Ok(HotkeyHandle {
+            thread_id,
+            thread: Some(thread),
+        }),
+        // The thread has already returned (or is about to).
+        Ok(Err(error)) => {
+            let _ = thread.join();
+            Err(error)
+        }
+        Err(_) => {
+            let _ = thread.join();
+            Err(HotkeyError::Failed)
+        }
+    }
+}
+
+fn win32_modifiers(hotkey: Hotkey) -> HOT_KEY_MODIFIERS {
+    let m = hotkey.modifiers();
+    // MOD_NOREPEAT: holding the shortcut down fires it only once.
+    [
+        (m.ctrl, MOD_CONTROL),
+        (m.alt, MOD_ALT),
+        (m.shift, MOD_SHIFT),
+        (m.win, MOD_WIN),
+    ]
+    .into_iter()
+    .filter(|(on, _)| *on)
+    .fold(MOD_NOREPEAT, |acc, (_, flag)| acc | flag)
+}
+
+/// Body of the listener thread: registers the shortcut, reports the
+/// outcome through `ready`, then calls `on_press` on every `WM_HOTKEY`
+/// until `WM_QUIT` arrives.
+#[allow(unsafe_code)]
+fn hotkey_thread(
+    hotkey: Hotkey,
+    on_press: Box<dyn Fn() + Send>,
+    ready: Sender<Result<u32, HotkeyError>>,
+) {
+    let mut msg = MSG::default();
+    // SAFETY: `msg` is a valid, writable local. Peeking creates this
+    // thread's message queue, so a `WM_QUIT` posted as soon as the id is
+    // handed out below is never lost. Nothing is removed from the queue.
+    unsafe {
+        PeekMessageW(
+            &mut msg,
+            std::ptr::null_mut(),
+            WM_USER,
+            WM_USER,
+            PM_NOREMOVE,
+        )
+    };
+    // SAFETY: no arguments.
+    let thread_id = unsafe { GetCurrentThreadId() };
+
+    // Letters (upper case) and digits share their ASCII code with their
+    // virtual-key code; `Hotkey::new` allows nothing else.
+    let vk = u32::from(hotkey.key());
+    // SAFETY: a null window means "post WM_HOTKEY to this thread"; the
+    // other arguments are plain integers.
+    let registered =
+        unsafe { RegisterHotKey(std::ptr::null_mut(), HOTKEY_ID, win32_modifiers(hotkey), vk) };
+    if registered == 0 {
+        // SAFETY: no arguments; reads the error of the call just above.
+        let code = unsafe { GetLastError() };
+        let error = if code == ERROR_HOTKEY_ALREADY_REGISTERED {
+            HotkeyError::AlreadyInUse
+        } else {
+            HotkeyError::Failed
+        };
+        let _ = ready.send(Err(error));
+        return;
+    }
+
+    if ready.send(Ok(thread_id)).is_ok() {
+        loop {
+            // SAFETY: `msg` is a valid, writable local; a null window and
+            // zero filters read every message of this thread.
+            let got = unsafe { GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) };
+            // 0 is WM_QUIT; -1 is an error. Either way, stop listening.
+            if got <= 0 {
+                break;
+            }
+            if msg.message == WM_HOTKEY && msg.wParam == HOTKEY_ID as usize {
+                // A panicking callback must not leave the shortcut
+                // registered with nobody listening.
+                let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(&on_press));
+            }
+        }
+    }
+
+    // SAFETY: unregisters the shortcut this same thread registered above
+    // (Windows requires the registering thread).
+    unsafe { UnregisterHotKey(std::ptr::null_mut(), HOTKEY_ID) };
+}
