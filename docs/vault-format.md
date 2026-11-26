@@ -158,6 +158,8 @@ Reglas:
 - `schema` es la versión del contenido, independiente de `format_version`. Si es mayor que la soportada → `UnsupportedSchema`: la app **no abre** el llavero, para no perder datos al guardarlo sin los campos nuevos.
 - Los campos desconocidos se rechazan (`deny_unknown_fields`) por el mismo motivo.
 - Las fechas van en UTC (RFC 3339).
+- `windows` asocia la entrada a ventanas de programas para el auto-type (`title` admite `*` como comodín; `process` es el nombre del ejecutable; se comparan sin distinguir mayúsculas). Una asociación con los dos campos vacíos no coincide con ninguna ventana.
+- `autotype` es la secuencia que se escribe; si falta o está vacía se usa `{USERNAME}{TAB}{PASSWORD}{ENTER}`. Sintaxis: texto literal y `{USERNAME}`, `{PASSWORD}`, `{TAB}`, `{ENTER}`, `{DELAY n}` (1–10000 ms), `{{}` y `{}}` para las llaves. Cualquier otra cosa entre llaves es un error (detalle en `core::autotype`).
 
 ## 6. Guardado atómico y copias de seguridad
 

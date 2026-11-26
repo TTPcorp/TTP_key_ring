@@ -42,11 +42,12 @@ fn new_id() -> Result<Uuid, CryptoError> {
 }
 
 /// A window an entry is associated with, for auto-type (Phase 2).
-/// A field set to `None` matches any value.
+/// A blank field matches any value, but an association with both
+/// fields blank matches no window (see [`WindowMatch::matches`]).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WindowMatch {
-    /// Window title (matching rules are defined in Phase 2).
+    /// Window title; `*` is a wildcard (see `autotype` for the rules).
     pub title: Option<String>,
     /// Executable name, e.g. `program.exe`.
     pub process: Option<String>,
