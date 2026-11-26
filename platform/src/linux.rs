@@ -42,3 +42,17 @@ impl Backend for OsBackend {
     }
     fn pause(&self) {}
 }
+
+use crate::hotkey::{Hotkey, HotkeyError};
+
+/// Global shortcuts are not implemented yet on Linux (Phase 4). No value
+/// of this type can exist.
+#[derive(Debug)]
+pub(crate) enum HotkeyHandle {}
+
+pub(crate) fn register_hotkey(
+    _hotkey: Hotkey,
+    _on_press: Box<dyn Fn() + Send>,
+) -> Result<HotkeyHandle, HotkeyError> {
+    Err(HotkeyError::Unsupported)
+}

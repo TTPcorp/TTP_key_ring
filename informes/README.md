@@ -55,3 +55,4 @@ Qué se ha hecho y para qué, en dos o tres frases.
 | [0014](0014-2026-11-25-verificacion-manual-windows.md) | 2026-11-25 | Verificación manual en Windows del portapapeles y del bloqueo automático | 1 |
 | [0015](0015-2026-11-25-secuencias-auto-type.md) | 2026-11-25 | Inicio de la Fase 2: secuencias de auto-type y asociación con ventanas | 2 |
 | [0016](0016-2026-11-26-ventana-activa-y-escritura.md) | 2026-11-26 | Ventana activa y escritura simulada en Windows (auto-type) | 2 |
+| [0017](0017-2026-11-26-atajo-global.md) | 2026-11-26 | Atajo de teclado global para el auto-type (Windows) | 2 |
