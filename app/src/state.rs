@@ -37,6 +37,12 @@ pub enum AppError {
     EmbeddedCredentials,
     ClipboardUnavailable,
     NothingToCopy,
+    AutoTypeSequenceInvalid,
+    AutoTypeExpired,
+    AutoTypeWindowChanged,
+    AutoTypeModifierPressed,
+    AutoTypeBlocked,
+    AutoTypeUnsupported,
     Io,
     Internal,
 }
@@ -647,15 +653,22 @@ impl AppState {
         result
     }
 
+    /// Runs `f` on the content of the unlocked vault.
+    pub fn with_data<T>(&self, f: impl FnOnce(&VaultData) -> T) -> Result<T, AppError> {
+        let slot = self.slot()?;
+        let vault = slot.as_ref().ok_or(AppError::Locked)?;
+        Ok(f(vault.data()))
+    }
+
     /// Test helper: run `f` on the unlocked vault.
     #[cfg(test)]
-    fn with_vault<T>(&self, f: impl FnOnce(&mut Vault) -> T) -> Option<T> {
+    pub(crate) fn with_vault<T>(&self, f: impl FnOnce(&mut Vault) -> T) -> Option<T> {
         self.slot().ok()?.as_mut().map(f)
     }
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use llavero_core::model::EntryInput;
     use std::path::Path;
@@ -664,7 +677,7 @@ mod tests {
         SecretString::from(s)
     }
 
-    fn state(dir: &Path) -> AppState {
+    pub(crate) fn state(dir: &Path) -> AppState {
         let fast = KdfParams::new(KdfParams::MIN_M_COST_KIB, KdfParams::MIN_T_COST, 1).unwrap();
         AppState::with_parts(
             dir.join("sub").join("llavero.vault"),

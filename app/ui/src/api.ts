@@ -131,6 +131,12 @@ export type ErrorCode =
   | "EmbeddedCredentials"
   | "ClipboardUnavailable"
   | "NothingToCopy"
+  | "AutoTypeSequenceInvalid"
+  | "AutoTypeExpired"
+  | "AutoTypeWindowChanged"
+  | "AutoTypeModifierPressed"
+  | "AutoTypeBlocked"
+  | "AutoTypeUnsupported"
   | "Io"
   | "Internal";
 
@@ -153,6 +159,16 @@ const messages: Record<ErrorCode, string> = {
   NothingToCopy: "Esta entrada no tiene ese dato.",
   EmbeddedCredentials:
     "Hay una dirección con «usuario@» delante del dominio, un truco típico de suplantación. Quítalo.",
+  AutoTypeSequenceInvalid: "La secuencia de auto-type de la entrada no es válida.",
+  AutoTypeExpired:
+    "La petición de auto-type ha caducado. Vuelve a la ventana del programa y pulsa el atajo otra vez.",
+  AutoTypeWindowChanged:
+    "Auto-type detenido: cambió la ventana activa. Puede que solo se haya escrito una parte.",
+  AutoTypeModifierPressed:
+    "Auto-type detenido: había una tecla Ctrl, Alt, Mayús o Win pulsada. Suelta el atajo y vuelve a intentarlo.",
+  AutoTypeBlocked:
+    "Windows no deja escribir en esa ventana (suele pasar si el programa se ejecuta como administrador).",
+  AutoTypeUnsupported: "El auto-type todavía no funciona en este sistema.",
   Io: "No se ha podido leer o escribir el archivo del llavero.",
   Internal: "Error interno de la aplicación.",
 };
@@ -195,3 +211,26 @@ export const copyToClipboard = (id: string, field: CopyField) =>
   invoke<number>("copy_to_clipboard", { id, field });
 /** Postpones the inactivity lock (call throttled on user input). */
 export const userActivity = () => invoke<void>("user_activity");
+
+/** An entry offered by the auto-type picker (no secrets). */
+export interface AutoTypeCandidate {
+  id: string;
+  name: string;
+  username: string;
+}
+
+/** What the last press of the auto-type shortcut needs to tell the user. */
+export type AutoTypeNotice =
+  | { kind: "hotkeyUnavailable"; hotkey: string }
+  | { kind: "locked"; hotkey: string }
+  | { kind: "noMatch"; window: string }
+  | { kind: "choose"; requestId: string; window: string; entries: AutoTypeCandidate[] }
+  | { kind: "failed"; error: unknown };
+
+/** Returns each notice once; polled by the UI. */
+export const autotypeNotice = () => invoke<AutoTypeNotice | null>("autotype_notice");
+/** Types the picked entry into the window captured at the shortcut press. */
+export const autotypeChoose = (requestId: string, entryId: string) =>
+  invoke<void>("autotype_choose", { requestId, entryId });
+export const autotypeCancel = (requestId: string) =>
+  invoke<void>("autotype_cancel", { requestId });
