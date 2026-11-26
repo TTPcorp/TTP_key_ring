@@ -45,6 +45,7 @@ fn main() {
             commands::autotype_notice,
             commands::autotype_choose,
             commands::autotype_cancel,
+            commands::check_autotype_sequence,
         ])
         .setup(|app| {
             // Auto-lock watcher: every 2 s, lock the vault if the Windows

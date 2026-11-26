@@ -26,6 +26,17 @@ export interface EntryDetails {
   urls: string[];
   hasPassword: boolean;
   hasNotes: boolean;
+  windows: WindowForm[];
+  /** Custom auto-type sequence; empty means the default one. */
+  autotype: string;
+}
+
+/** A program window associated with an entry (auto-type). Blank = "". */
+export interface WindowForm {
+  /** Window title; `*` is a wildcard. */
+  title: string;
+  /** Executable name, e.g. `programa.exe`. */
+  process: string;
 }
 
 /**
@@ -38,6 +49,38 @@ export interface EntryForm {
   password: string | null;
   urls: string[];
   notes: string | null;
+  windows: WindowForm[];
+  /** Blank means the default sequence. */
+  autotype: string;
+}
+
+export const DEFAULT_AUTOTYPE = "{USERNAME}{TAB}{PASSWORD}{ENTER}";
+
+export type SequenceProblemReason =
+  | "tooLong"
+  | "unclosedBrace"
+  | "unexpectedClosingBrace"
+  | "unknownPlaceholder"
+  | "invalidDelay";
+
+export interface SequenceProblem {
+  reason: SequenceProblemReason;
+  /** Character position (0-based) of the offending brace, if any. */
+  position: number | null;
+}
+
+const sequenceProblemMessages: Record<SequenceProblemReason, string> = {
+  tooLong: "La secuencia es demasiado larga (máximo 1000 caracteres).",
+  unclosedBrace: "Falta cerrar una llave «{».",
+  unexpectedClosingBrace: "Sobra una llave «}». Para escribirla tal cual, usa {}}.",
+  unknownPlaceholder: "Marcador desconocido. Usa {USERNAME}, {PASSWORD}, {TAB}, {ENTER} o {DELAY n}.",
+  invalidDelay: "Pausa no válida: usa {DELAY n} con n entre 1 y 10000 milisegundos.",
+};
+
+/** User-facing description of a sequence problem. */
+export function sequenceProblemMessage(problem: SequenceProblem): string {
+  const where = problem.position === null ? "" : ` (carácter ${problem.position + 1})`;
+  return sequenceProblemMessages[problem.reason] + where;
 }
 
 export type SecretField = "password" | "notes";
@@ -159,7 +202,7 @@ const messages: Record<ErrorCode, string> = {
   NothingToCopy: "Esta entrada no tiene ese dato.",
   EmbeddedCredentials:
     "Hay una dirección con «usuario@» delante del dominio, un truco típico de suplantación. Quítalo.",
-  AutoTypeSequenceInvalid: "La secuencia de auto-type de la entrada no es válida.",
+  AutoTypeSequenceInvalid: "La secuencia de auto-type de la entrada no es válida. Revísala en el formulario.",
   AutoTypeExpired:
     "La petición de auto-type ha caducado. Vuelve a la ventana del programa y pulsa el atajo otra vez.",
   AutoTypeWindowChanged:
@@ -202,6 +245,9 @@ export const deleteEntry = (id: string, password: string) =>
 /** Estimates the strength of a password being typed (never stored). */
 export const estimateStrength = (password: string, context: StrengthContext) =>
   invoke<StrengthEstimate>("estimate_strength", { password, context });
+/** Live check of an auto-type sequence; `null` means valid. */
+export const checkAutotypeSequence = (sequence: string) =>
+  invoke<SequenceProblem | null>("check_autotype_sequence", { sequence });
 export const checkUrl = (input: string) => invoke<WebAddressInfo>("check_url", { input });
 export const generatePassword = (options: GeneratorOptions) =>
   invoke<GeneratedPassword>("generate_password", { options });

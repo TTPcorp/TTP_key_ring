@@ -2,7 +2,10 @@
   import { onDestroy, onMount } from "svelte";
   import {
     addEntry,
+    checkAutotypeSequence,
     checkUrl,
+    DEFAULT_AUTOTYPE,
+    sequenceProblemMessage,
     deleteEntry,
     errorMessage,
     estimateStrength,
@@ -13,6 +16,8 @@
     updateEntry,
     webWarningMessages,
     type GeneratorOptions,
+    type SequenceProblem,
+    type WindowForm,
     type StrengthEstimate,
     type WebAddressInfo,
   } from "./api";
@@ -120,6 +125,33 @@
     );
   }
 
+  // Auto-type: associated program windows and the typing sequence.
+  let windows = $state<WindowForm[]>([]);
+  let autotype = $state("");
+  let sequenceProblem = $state<SequenceProblem | null>(null);
+  let sequenceTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function scheduleSequenceCheck() {
+    clearTimeout(sequenceTimer);
+    sequenceTimer = setTimeout(async () => {
+      const text = autotype;
+      try {
+        const problem = await checkAutotypeSequence(text);
+        if (text === autotype) sequenceProblem = problem;
+      } catch {
+        sequenceProblem = null;
+      }
+    }, 200);
+  }
+
+  function addWindow() {
+    windows = [...windows, { title: "", process: "" }];
+  }
+
+  function removeWindow(index: number) {
+    windows = windows.filter((_, i) => i !== index);
+  }
+
   let masterPassword = $state("");
   let deleteError = $state("");
   let busy = $state(false);
@@ -136,7 +168,10 @@
       urlsText = entry.urls.join("\n");
       hasPassword = entry.hasPassword;
       hasNotes = entry.hasNotes;
+      windows = entry.windows;
+      autotype = entry.autotype;
       runUrlCheck();
+      if (autotype !== "") scheduleSequenceCheck();
     } catch (err) {
       error = errorMessage(err);
     } finally {
@@ -148,6 +183,7 @@
   onDestroy(() => {
     clearTimeout(urlTimer);
     clearTimeout(estimateTimer);
+    clearTimeout(sequenceTimer);
     password = "";
     notes = "";
     masterPassword = "";
@@ -212,6 +248,8 @@
       urls: urlsText.split("\n"),
       password: !editing || passwordTouched ? password : null,
       notes: !editing || notesTouched ? notes : null,
+      windows,
+      autotype,
     };
     try {
       if (id === null) {
@@ -380,6 +418,77 @@
           {/each}
         </ul>
       {/if}
+
+      <fieldset class="autotype">
+        <legend>Auto-type en programas</legend>
+        <p class="hint">
+          Al pulsar Ctrl+Alt+A en la ventana de un programa asociado, se escribe la secuencia. En el
+          título, * vale por cualquier texto (por ejemplo, «Banco*»).
+        </p>
+        {#each windows as win, i (i)}
+          <div class="window-row">
+            <label>
+              Título de la ventana
+              <input
+                type="text"
+                bind:value={win.title}
+                placeholder="Inicio de sesión*"
+                spellcheck="false"
+                disabled={busy}
+              />
+            </label>
+            <label>
+              Programa
+              <input
+                type="text"
+                bind:value={win.process}
+                placeholder="programa.exe"
+                spellcheck="false"
+                disabled={busy}
+              />
+            </label>
+            <button
+              type="button"
+              class="secondary small"
+              aria-label="Quitar ventana {i + 1}"
+              onclick={() => removeWindow(i)}
+              disabled={busy}
+            >
+              Quitar
+            </button>
+            {#if win.process.trim() === "" && win.title.trim() !== ""}
+              <p class="hint wide">
+                Solo por título: cualquier programa o web puede imitarlo, así que se pedirá confirmación
+                antes de escribir. Indica también el programa para que se escriba directamente.
+              </p>
+            {/if}
+          </div>
+        {/each}
+        <div>
+          <button type="button" class="secondary small" onclick={addWindow} disabled={busy}>
+            Añadir ventana
+          </button>
+        </div>
+        <label>
+          Secuencia (vacía = por defecto)
+          <input
+            type="text"
+            bind:value={autotype}
+            oninput={scheduleSequenceCheck}
+            placeholder={DEFAULT_AUTOTYPE}
+            spellcheck="false"
+            disabled={busy}
+          />
+        </label>
+        {#if sequenceProblem && autotype.trim() !== ""}
+          <p class="bad">✗ {sequenceProblemMessage(sequenceProblem)}</p>
+        {:else}
+          <p class="hint">
+            Marcadores: {"{USERNAME}"}, {"{PASSWORD}"}, {"{TAB}"}, {"{ENTER}"} y {"{DELAY n}"} (pausa
+            de n ms). El resto se escribe tal cual.
+          </p>
+        {/if}
+      </fieldset>
 
       <div class="field">
         <label for="entry-notes">Notas</label>

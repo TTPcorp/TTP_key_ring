@@ -515,3 +515,33 @@ select {
 .autotype-picker .actions {
   margin-top: 12px;
 }
+
+fieldset.autotype {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+fieldset.autotype p {
+  margin: 0;
+}
+
+.window-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.window-row .wide {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 560px) {
+  .window-row {
+    grid-template-columns: 1fr;
+  }
+}

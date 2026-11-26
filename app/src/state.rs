@@ -5,9 +5,10 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use llavero_core::autotype::{Sequence, SequenceError};
 use llavero_core::crypto::KdfParams;
 use llavero_core::generator::{self, GeneratorError, PasswordOptions};
-use llavero_core::model::{Entry, EntryInput, ModelError, VaultData};
+use llavero_core::model::{Entry, EntryInput, ModelError, VaultData, WindowMatch};
 use llavero_core::strength::{self, StrengthEstimate};
 use llavero_core::vault::{Vault, VaultError};
 use llavero_core::web::{self, WebAddressError, WebWarning};
@@ -143,6 +144,29 @@ pub struct EntryDetails {
     pub urls: Vec<String>,
     pub has_password: bool,
     pub has_notes: bool,
+    pub windows: Vec<WindowForm>,
+    /// Custom auto-type sequence; empty means the default one.
+    pub autotype: String,
+}
+
+/// A program window associated with an entry, as edited in the form.
+/// Blank fields are empty strings.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WindowForm {
+    /// Window title; `*` is a wildcard.
+    pub title: String,
+    /// Executable name, e.g. `programa.exe`.
+    pub process: String,
+}
+
+impl From<&WindowMatch> for WindowForm {
+    fn from(w: &WindowMatch) -> Self {
+        Self {
+            title: w.title.clone().unwrap_or_default(),
+            process: w.process.clone().unwrap_or_default(),
+        }
+    }
 }
 
 /// Entry form sent by the frontend to create or update an entry.
@@ -157,6 +181,10 @@ pub struct EntryForm {
     pub password: Option<SecretString>,
     pub urls: Vec<String>,
     pub notes: Option<SecretString>,
+    /// Associated program windows (auto-type).
+    pub windows: Vec<WindowForm>,
+    /// Custom auto-type sequence; blank means the default one.
+    pub autotype: String,
 }
 
 /// Field the user asked to copy to the clipboard.
@@ -324,6 +352,75 @@ fn clean_urls(urls: Vec<String>) -> Result<Vec<String>, AppError> {
         }
     }
     Ok(clean)
+}
+
+/// Drops blank associations, trims the fields, keeps only the file name
+/// of the executable (folders are ignored when matching) and removes
+/// duplicates.
+fn clean_windows(windows: Vec<WindowForm>) -> Vec<WindowMatch> {
+    let mut clean: Vec<WindowMatch> = Vec::new();
+    for w in windows {
+        let title = w.title.trim();
+        let process = w.process.trim();
+        let process = process.rsplit(['\\', '/']).next().unwrap_or(process).trim();
+        if title.is_empty() && process.is_empty() {
+            continue;
+        }
+        let m = WindowMatch {
+            title: (!title.is_empty()).then(|| title.to_owned()),
+            process: (!process.is_empty()).then(|| process.to_owned()),
+        };
+        if !clean.contains(&m) {
+            clean.push(m);
+        }
+    }
+    clean
+}
+
+/// A blank sequence means the default one; anything else must be valid.
+fn clean_autotype(sequence: String) -> Result<Option<String>, AppError> {
+    if sequence.trim().is_empty() {
+        return Ok(None);
+    }
+    Sequence::parse(&sequence).map_err(|_| AppError::AutoTypeSequenceInvalid)?;
+    Ok(Some(sequence))
+}
+
+/// Why an auto-type sequence is not valid, for live feedback in the form.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SequenceProblem {
+    pub reason: SequenceProblemReason,
+    /// Character position of the offending brace, when there is one.
+    pub position: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SequenceProblemReason {
+    TooLong,
+    UnclosedBrace,
+    UnexpectedClosingBrace,
+    UnknownPlaceholder,
+    InvalidDelay,
+}
+
+/// Checks a sequence typed in the form. A blank one is valid (it means
+/// the default sequence).
+pub fn check_autotype_sequence(sequence: &str) -> Option<SequenceProblem> {
+    use SequenceProblemReason as R;
+    if sequence.trim().is_empty() {
+        return None;
+    }
+    let (reason, position) = match Sequence::parse(sequence).err()? {
+        SequenceError::Empty => return None,
+        SequenceError::TooLong => (R::TooLong, None),
+        SequenceError::UnclosedBrace(p) => (R::UnclosedBrace, Some(p)),
+        SequenceError::UnexpectedClosingBrace(p) => (R::UnexpectedClosingBrace, Some(p)),
+        SequenceError::UnknownPlaceholder(p) => (R::UnknownPlaceholder, Some(p)),
+        SequenceError::InvalidDelay(p) => (R::InvalidDelay, Some(p)),
+    };
+    Some(SequenceProblem { reason, position })
 }
 
 /// Finds an entry by the string id the frontend got from the list.
@@ -562,6 +659,8 @@ impl AppState {
             urls: e.urls().to_vec(),
             has_password: !e.password().expose_secret().is_empty(),
             has_notes: !e.notes().expose_secret().is_empty(),
+            windows: e.windows().iter().map(WindowForm::from).collect(),
+            autotype: e.autotype().unwrap_or_default().to_owned(),
         })
     }
 
@@ -586,6 +685,8 @@ impl AppState {
                 form.password.unwrap_or_else(|| SecretString::from("")),
             );
             input.urls = clean_urls(form.urls)?;
+            input.windows = clean_windows(form.windows);
+            input.autotype = clean_autotype(form.autotype)?;
             if let Some(notes) = form.notes {
                 input.notes = notes;
             }
@@ -593,9 +694,8 @@ impl AppState {
         })
     }
 
-    /// Updates the editable fields of an entry. Untouched secrets and the
-    /// fields the form does not show yet (auto-type windows and sequence)
-    /// are kept as they are.
+    /// Updates the editable fields of an entry. Untouched secrets are kept
+    /// as they are.
     pub fn update(&self, id: &str, form: EntryForm) -> Result<(), AppError> {
         self.touch();
         self.modify(|data| {
@@ -607,8 +707,8 @@ impl AppState {
                     .password
                     .unwrap_or_else(|| copy_secret(current.password())),
                 urls: clean_urls(form.urls)?,
-                windows: current.windows().to_vec(),
-                autotype: current.autotype().map(str::to_owned),
+                windows: clean_windows(form.windows),
+                autotype: clean_autotype(form.autotype)?,
                 notes: form.notes.unwrap_or_else(|| copy_secret(current.notes())),
             };
             let entry_id = current.id();
@@ -971,6 +1071,8 @@ pub(crate) mod tests {
                 "a.example.com".into(),
             ],
             notes: notes.map(pw),
+            windows: vec![],
+            autotype: String::new(),
         }
     }
 
@@ -1002,6 +1104,8 @@ pub(crate) mod tests {
                 urls: vec!["https://a.example.com/".into()],
                 has_password: true,
                 has_notes: true,
+                windows: vec![],
+                autotype: String::new(),
             }
         );
 
@@ -1046,7 +1150,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn update_keeps_autotype_fields() {
+    fn update_round_trips_autotype_fields() {
         let dir = tempfile::tempdir().unwrap();
         let s = unlocked(dir.path());
         let id = s
@@ -1060,7 +1164,12 @@ pub(crate) mod tests {
                 v.data_mut().add_entry(e).unwrap().to_string()
             })
             .unwrap();
-        s.update(&id, form("renamed", None, None)).unwrap();
+        // The form sends back what `get` returned.
+        let details = s.get(&id).unwrap();
+        let mut f = form("renamed", None, None);
+        f.windows = details.windows;
+        f.autotype = details.autotype;
+        s.update(&id, f).unwrap();
         s.with_vault(|v| {
             let e = &v.data().entries()[0];
             assert_eq!(e.autotype(), Some("{USERNAME}{TAB}{PASSWORD}{ENTER}"));
@@ -1161,14 +1270,14 @@ pub(crate) mod tests {
     #[test]
     fn form_deserializes_absent_secrets_as_untouched() {
         let f: EntryForm = serde_json::from_str(
-            r#"{"name":"n","username":"u","password":null,"urls":[],"notes":"x"}"#,
+            r#"{"name":"n","username":"u","password":null,"urls":[],"notes":"x","windows":[],"autotype":""}"#,
         )
         .unwrap();
         assert!(f.password.is_none());
         assert_eq!(f.notes.unwrap().expose_secret(), "x");
         assert!(
             serde_json::from_str::<EntryForm>(
-                r#"{"name":"n","username":"u","password":null,"urls":[],"notes":null,"extra":1}"#
+                r#"{"name":"n","username":"u","password":null,"urls":[],"notes":null,"windows":[],"autotype":"","extra":1}"#
             )
             .is_err()
         );
@@ -1322,5 +1431,99 @@ pub(crate) mod tests {
             // Tests run as debug builds: never the production folder.
             assert_eq!(DATA_FOLDER, "LLavero Digital (desarrollo)");
         }
+    }
+
+    fn window(title: &str, process: &str) -> WindowForm {
+        WindowForm {
+            title: title.into(),
+            process: process.into(),
+        }
+    }
+
+    #[test]
+    fn auto_type_fields_are_saved_cleaned_and_returned() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = unlocked(dir.path());
+        let mut f = form("ERP", Some("pw"), None);
+        f.windows = vec![
+            window(" ERP* ", r" C:\Program Files\ERP\erp.exe "),
+            window("  ", " "),
+            window("ERP*", "erp.exe"),
+            window("Solo título", ""),
+        ];
+        f.autotype = "{USERNAME}{ENTER}{DELAY 300}{PASSWORD}{ENTER}".into();
+        let id = s.add(f).unwrap();
+
+        let details = s.get(&id).unwrap();
+        assert_eq!(
+            details.windows,
+            vec![window("ERP*", "erp.exe"), window("Solo título", "")]
+        );
+        assert_eq!(
+            details.autotype,
+            "{USERNAME}{ENTER}{DELAY 300}{PASSWORD}{ENTER}"
+        );
+        s.with_vault(|v| {
+            let entry = &v.data().entries()[0];
+            assert_eq!(entry.windows()[1].process, None);
+        })
+        .unwrap();
+
+        // A blank sequence goes back to the default one; associations can
+        // be removed.
+        let mut f = form("ERP", None, None);
+        f.autotype = "   ".into();
+        s.update(&id, f).unwrap();
+        let details = s.get(&id).unwrap();
+        assert!(details.windows.is_empty());
+        assert_eq!(details.autotype, "");
+        s.with_vault(|v| assert_eq!(v.data().entries()[0].autotype(), None))
+            .unwrap();
+    }
+
+    #[test]
+    fn invalid_sequence_is_rejected_and_nothing_changes() {
+        let dir = tempfile::tempdir().unwrap();
+        let s = unlocked(dir.path());
+        let mut f = form("ERP", Some("pw"), None);
+        f.autotype = "{USERNAME}{TABB}".into();
+        assert_eq!(s.add(f), Err(AppError::AutoTypeSequenceInvalid));
+        assert!(s.list("").unwrap().is_empty());
+
+        let id = s.add(form("ERP", Some("pw"), None)).unwrap();
+        let mut f = form("Renamed", None, None);
+        f.autotype = "{".into();
+        assert_eq!(s.update(&id, f), Err(AppError::AutoTypeSequenceInvalid));
+        assert_eq!(s.get(&id).unwrap().name, "ERP");
+    }
+
+    #[test]
+    fn sequence_check_for_the_form() {
+        assert_eq!(check_autotype_sequence(""), None);
+        assert_eq!(check_autotype_sequence("  "), None);
+        assert_eq!(check_autotype_sequence("{USERNAME}{TAB}{PASSWORD}"), None);
+        assert_eq!(
+            check_autotype_sequence("ab{TABB}"),
+            Some(SequenceProblem {
+                reason: SequenceProblemReason::UnknownPlaceholder,
+                position: Some(2),
+            })
+        );
+        assert_eq!(
+            check_autotype_sequence("{DELAY 0}"),
+            Some(SequenceProblem {
+                reason: SequenceProblemReason::InvalidDelay,
+                position: Some(0),
+            })
+        );
+        assert_eq!(
+            check_autotype_sequence(&"x".repeat(1001)),
+            Some(SequenceProblem {
+                reason: SequenceProblemReason::TooLong,
+                position: None,
+            })
+        );
+        let json = serde_json::to_string(&check_autotype_sequence("a}")).unwrap();
+        assert_eq!(json, r#"{"reason":"unexpectedClosingBrace","position":1}"#);
     }
 }
